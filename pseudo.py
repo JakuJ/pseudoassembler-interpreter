@@ -28,11 +28,9 @@ def interpret(line):
             has_label = False
             break
     if has_label:
-        print("MAM ETYKIETE DO WYRZUCENIA")
         line = line.split()
         line.pop(0)
         line = ' '.join(line).lstrip()
-        print('NOWA LINIJKA: ', line)
     if match('^[A-Z_]+\s+D[CS]\s+INTEGER', line): # DYREKTYWY DEKLARACJI ZMIENNYCH
         line = sub('[\(\)\n]','', line).split()
         label = line[0]
@@ -80,22 +78,14 @@ def interpret(line):
         line = line.split()
         order = line[0]
         label = sub('\n','',line[1])
-        if order == "J":
-            program.seek(LABELS[label])
-            print("JUMPING TO ")
+        if order == "J": program.seek(LABELS[label])
         elif order == "JP":
-            if STATE == 0b01:
-                program.seek(LABELS[label])
-                print("JUMPING TO ", label)
+            if STATE == 0b01: program.seek(LABELS[label])
         elif order == "JN":
-            if STATE == 0b10:
-                program.seek(LABELS[label])
-                print("JUMPING TO ", label)
+            if STATE == 0b10: program.seek(LABELS[label])
         elif order == "JZ":
-            if STATE == 0b00:
-                program.seek(LABELS[label])
-                print("JUMPING TO ", label)
-
+            if STATE == 0b00: program.seek(LABELS[label])
+                
 def dump_all():
     print("-" * 30)
     print("LABELS:")
@@ -126,15 +116,11 @@ def main():
     # GŁÓWNA PĘTLA
     while True:
         line = program.readline()
-        print("LINE:\"", line, "\"")
         if match('^\s*$', line): continue
         if match('\s*KONIEC\s*', line): break
         print(line)
         interpret(line)
-        dump_all()
     dump_all()
     program.close()
 
 main()
-print(get_label("4"))
-print(read_adress("DZIELENIE"))
