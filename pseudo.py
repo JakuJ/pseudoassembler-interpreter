@@ -1,6 +1,7 @@
 from re import match, sub
 from collections import OrderedDict
 
+ORDERS = ['^J[PNZ]?\s+.+', '^[A-Z_]+\s+D[CS]\s+INTEGER.+', '^(L[AR]?|ST)\s+[0-9]+\s+,\s+.+', '^[ASMDC]R?\s+[0-9]+\s+,\s+.+']
 LABELS = dict()
 REGISTER = [0] * 16
 MEMORY = OrderedDict()
