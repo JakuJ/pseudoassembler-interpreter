@@ -13,10 +13,10 @@ def set_state(target):
     elif REGISTER[int(target)] > 0: STATE = 0b01
     else: STATE = 0b10
 
-def read_adress(cell):
-    return list(MEMORY.keys()).index(cell)
-def get_label(cell):
-    return list(MEMORY.keys())[int(cell)]
+def read_adress(label):
+    return list(MEMORY.keys()).index(label)
+def get_label(adress):
+    return list(MEMORY.keys())[int(adress)]
 
 def interpret(line):
     global STATE, REGISTER, MEMORY, LABELS, ORDERS
@@ -67,7 +67,7 @@ def interpret(line):
         if match('^A', order): REGISTER[int(target)] += source
         elif match('^S', order): REGISTER[int(target)] -= source
         elif match('^M', order): REGISTER[int(target)] *= source
-        elif match('^D', order): REGISTER[int(target)] /= source
+        elif match('^D', order): REGISTER[int(target)] //= source
         set_state(target)
         # COMPARE
         if match('^C', order):
@@ -109,12 +109,12 @@ def dump_all():
 
 def main():
     global program
-    program = open("testowy_program.txt", mode='r')
+    program = open("potegi.txt", mode='r')
     # PREPROCESSING ETYKIET SKOKU
     while True:
         location = program.tell()
         line = program.readline()
-        if line == "": break
+        if match('^\s*$', line): break
         is_label = True
         for regex in ORDERS:
             if match(regex, line): 
@@ -126,11 +126,15 @@ def main():
     # GŁÓWNA PĘTLA
     while True:
         line = program.readline()
+        print("LINE:\"", line, "\"")
+        if match('^\s*$', line): continue
+        if match('\s*KONIEC\s*', line): break
         print(line)
         interpret(line)
         dump_all()
-        if line == "": break
     dump_all()
     program.close()
 
 main()
+print(get_label("4"))
+print(read_adress("DZIELENIE"))
