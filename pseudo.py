@@ -1,7 +1,7 @@
 from re import match, sub
 from collections import OrderedDict
 
-ORDERS = ['^J[PNZ]?\s+.+', '^[A-Z_]+\s+D[CS]\s+INTEGER.+', '^(L[AR]?|ST)\s+[0-9]+\s+,\s+.+', '^[ASMDC]R?\s+[0-9]+\s+,\s+.+']
+ORDERS = ['^J[PNZ]?\s+.+', '^[A-Z_]+\s+D[CS]\s+INTEGER.*', '^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', '^[ASMDC]R?\s+[0-9]+\s*,\s*.+']
 LABELS = dict()
 REGISTER = [0] * 16
 MEMORY = OrderedDict()
@@ -19,9 +19,22 @@ def get_label(cell):
     return list(MEMORY.keys())[int(cell)]
 
 def interpret(line):
-    global STATE, REGISTER, MEMORY, LABELS
+    global STATE, REGISTER, MEMORY, LABELS, ORDERS
+    # IGNORUJ ETYKIETY
+    has_label = True
+    line = line.lstrip().rstrip() # OBETNIJ Z BIAŁYCH ZNAKÓW
+    for regex in ORDERS:
+        if match(regex, line): 
+            has_label = False
+            break
+    if has_label:
+        print("MAM ETYKIETE DO WYRZUCENIA")
+        line = line.split()
+        line.pop(0)
+        line = ' '.join(line).lstrip()
+        print('NOWA LINIJKA: ', line)
     if match('^[A-Z_]+\s+D[CS]\s+INTEGER', line): # DYREKTYWY DEKLARACJI ZMIENNYCH
-        line = sub('[\(\)\n]','', line).split(' ')
+        line = sub('[\(\)\n]','', line).split()
         label = line[0]
         order = line[1]
         if order == "DC":
@@ -30,7 +43,7 @@ def interpret(line):
         elif order == "DS":
             MEMORY[label] = None
     elif match('^(L[AR]?|ST)\s+[0-9]+,\s+.+', line): # OPERACJE ŁADOWANIA Z I DO PAMIĘCI
-        line = sub('[,\n]','', line).split(' ')
+        line = sub('[,\n]','', line).split()
         order = line[0]
         target = line[1]
         source = line[2]
@@ -43,7 +56,7 @@ def interpret(line):
             if match('^[A-Z_]+$', target): MEMORY[target] = REGISTER[int(source)]
             elif match('^[0-9]+$', target): MEMORY[get_label(target)] = REGISTER[int(source)]
     elif match('^[ASMDC]R?\s+[0-9]+,\s+.+', line): # OPERACJE ARYTMETYCZNE I PORÓWNANIA
-        line = sub('[,\n]','', line).split(' ')
+        line = sub('[,\n]','', line).split()
         order = line[0]
         target = line[1]
         source = line[2]
@@ -64,17 +77,24 @@ def interpret(line):
             elif target > source: STATE = 0b10
             else: STATE = 0b11
     elif match('^J[PNZ]?\s+[A-Z_]+', line): # OPERACJE SKOKU
-        line = line.split(' ')
+        line = line.split()
         order = line[0]
         label = sub('\n','',line[1])
-        if order == "J": program.seek(LABELS[label])
+        if order == "J":
+            program.seek(LABELS[label])
+            print("JUMPING TO ")
         elif order == "JP":
-            if STATE == 0b01: program.seek(LABELS[label])
+            if STATE == 0b01:
+                program.seek(LABELS[label])
+                print("JUMPING TO ", label)
         elif order == "JN":
-            if STATE == 0b10: program.seek(LABELS[label])
+            if STATE == 0b10:
+                program.seek(LABELS[label])
+                print("JUMPING TO ", label)
         elif order == "JZ":
-            if STATE == 0b00: program.seek(LABELS[label])
-
+            if STATE == 0b00:
+                program.seek(LABELS[label])
+                print("JUMPING TO ", label)
 
 def dump_all():
     print("-" * 30)
@@ -94,9 +114,13 @@ def main():
     while True:
         location = program.tell()
         line = program.readline()
-        if match('^[A-Z_]+$', line):
-            LABELS[sub('\n','',line)] = location
         if line == "": break
+        is_label = True
+        for regex in ORDERS:
+            if match(regex, line): 
+                is_label = False
+                break
+        if is_label: LABELS[line.split(' ')[0]] = location
     # WYZEROWANIE POZYCJI WSKAŹNIKA STRUMIENIA
     program.seek(0)
     # GŁÓWNA PĘTLA
@@ -104,7 +128,9 @@ def main():
         line = program.readline()
         print(line)
         interpret(line)
+        dump_all()
         if line == "": break
     dump_all()
     program.close()
+
 main()
