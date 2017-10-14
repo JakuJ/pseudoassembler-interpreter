@@ -14,7 +14,8 @@ def set_state(target):
     global STATE
     if REGISTER[int(target)] == 0: STATE = 0b00
     elif REGISTER[int(target)] > 0: STATE = 0b01
-    else: STATE = 0b10
+    elif REGISTER[int(target)] < 0: STATE = 0b10
+    else: STATE = 0b11
 
 def get_short_adress(label):
     if match('^[A-Z_]+$', label): return (MEMORY_LABELS[label] - MEMORY_START) // WORD_LENGTH # ETYKIETA
@@ -102,8 +103,8 @@ def interpret(line):
         if match('^C', order):
             target = REGISTER[int(target)]
             if target == source: STATE = 0b00
-            elif target < source: STATE = 0b10
-            elif target > source: STATE = 0b01
+            elif target > source: STATE = 0b10
+            elif target < source: STATE = 0b01
             else: STATE = 0b11
     elif match('^J[PNZ]?\s+[A-Z_]+', line): # OPERACJE SKOKU
         line = line.split()
@@ -132,11 +133,12 @@ def dump_all():
 
 def main():
     global program
-    program = open("suma_wektora.txt", mode='r')
+    program = open("nwd.txt", mode='r')
     # PREPROCESSING ETYKIET SKOKU
     while True:
         location = program.tell()
         line = program.readline().lstrip()
+        line = sub('\#.*', '', line)
         if match('^\s*$', line): continue
         is_label = True
         for regex in ORDERS:
@@ -145,16 +147,19 @@ def main():
                 break
         print(line, is_label)
         if is_label: LABELS[line.split()[0]] = location
-        if match('^KONIEC$', line): break
+        if match('^\s*KONIEC\s*$', line): break
     # WYZEROWANIE POZYCJI WSKAŹNIKA STRUMIENIA
     program.seek(0)
     # GŁÓWNA PĘTLA
     while True:
         line = program.readline()
+        # USUWANIE KOMENTARZY
+        line = sub('\#.+', '', line)
         if match('^\s*$', line): continue
-        if match('^KONIEC$', line): break
+        if match('^\s*KONIEC\s*$', line): break
         print(line)
         interpret(line)
+        dump_all()
     dump_all()
     program.close()
 
