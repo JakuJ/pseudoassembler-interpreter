@@ -1,5 +1,5 @@
 A       DC INTEGER (3)
-B       DC INTEGER(7)
+B       DC INTEGER (7)
 C       DC INTEGER (-8)
 DELTA   DS INTEGER
 WYNIK   DS INTEGER

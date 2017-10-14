@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from re import match, sub
 
 MEMORY_START = 1000
@@ -75,7 +76,6 @@ def interpret(line):
             elif order == "DS": # ALOKACJA PAMIĘCI BEZ WARTOSCI
                 store_label(label)
                 for _ in range(count): MEMORY.append(None)
-
     elif match('^(L[AR]?|ST)\s+[0-9]+,\s+.+', line): # OPERACJE ŁADOWANIA Z I DO PAMIĘCI
         line = sub('[,\n]','', line).split()
         order = line[0]
@@ -103,8 +103,8 @@ def interpret(line):
         if match('^C', order):
             target = REGISTER[int(target)]
             if target == source: STATE = 0b00
-            elif target > source: STATE = 0b10
-            elif target < source: STATE = 0b01
+            elif target > source: STATE = 0b01
+            elif target < source: STATE = 0b10
             else: STATE = 0b11
     elif match('^J[PNZ]?\s+[A-Z_]+', line): # OPERACJE SKOKU
         line = line.split()
@@ -159,7 +159,6 @@ def main():
         if match('^\s*KONIEC\s*$', line): break
         print(line)
         interpret(line)
-        dump_all()
     dump_all()
     program.close()
 
