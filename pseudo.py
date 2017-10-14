@@ -1,10 +1,11 @@
 from re import match, sub
 
-_MEMORY_START_ = 0
+MEMORY_START = 1000
+WORD_LENGTH = 4
 
 ORDERS = ['^J[PNZ]?\s+.+', '^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', '^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', '^[ASMDC]R?\s+[0-9]+\s*,\s*.+']
 LABELS = dict()
-REGISTER = [0] * 16
+REGISTER = [None] * 14 + [MEMORY_START,0]
 MEMORY = []
 MEMORY_LABELS = dict()
 STATE = 0
@@ -15,14 +16,29 @@ def set_state(target):
     elif REGISTER[int(target)] > 0: STATE = 0b01
     else: STATE = 0b10
 
-def read_adress(label):
-    return MEMORY_LABELS[label]
+def get_short_adress(label):
+    if match('^[A-Z_]+$', label): return (MEMORY_LABELS[label] - MEMORY_START) // WORD_LENGTH # ETYKIETA
+    elif match('^[0-9]+$', label): return (int(label) - MEMORY_START) // WORD_LENGTH # ADRES
+    elif match('^[0-9]+\([0-9]+\)$', label): # REJESTR ADRESOWY
+        label = sub('\)', '', label).split('(')
+        delta = int(label[0])
+        register = int(label[1])
+        return get_short_adress(str(REGISTER[register] + delta))
+
+def store_label(label):
+    global MEMORY, MEMORY_LABELS, MEMORY_START
+    MEMORY_LABELS[label] = len(MEMORY) * WORD_LENGTH + MEMORY_START
+
+def get_label(input_adress):
+    for label, adress in MEMORY_LABELS.items():
+        if adress == input_adress: return adress
 
 def interpret(line):
     global STATE, REGISTER, MEMORY, LABELS, ORDERS
     # IGNORUJ ETYKIETY
     has_label = True
     line = line.lstrip().rstrip() # OBETNIJ Z BIAŁYCH ZNAKÓW
+    print("Line before: ", line)
     for regex in ORDERS:
         if match(regex, line): 
             has_label = False
@@ -31,6 +47,7 @@ def interpret(line):
         line = line.split()
         line.pop(0)
         line = ' '.join(line).lstrip()
+        print("Line after: ", line)
     # WŁASCIWE INSTRUKCJE
     if match('^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', line): # DYREKTYWY DEKLARACJI ZMIENNYCH
         if match('^[A-Z_]+\s+D[CS]\s+INTEGER', line): # POJEDYŃCZE ZMIENNE
@@ -39,39 +56,34 @@ def interpret(line):
             order = line[1]   
             if order == "DC":
                 value = int(line[3])
-                MEMORY_LABELS[label] = len(MEMORY)
+                store_label(label)
                 MEMORY.append(value)
             elif order == "DS":
-                MEMORY_LABELS[label] = len(MEMORY)
+                store_label(label)
                 MEMORY.append(None)
         elif match('^[A-Z_]+\s+D[CS]\s+[0-9]+\*INTEGER', line): #  TABLICE ZMIENNYCH
             line = sub('[\(\)\n]','', line).split()
             line[2] = line[2].split('*')
-            print(line)
             label = line[0]
             order = line[1]
             count = int(line[2][0])
             if order == "DC": # WARTOSCI OKRESLONE
                 number = int(line[3])
-                MEMORY_LABELS[label] = len(MEMORY)
+                store_label(label)
                 for _ in range(count): MEMORY.append(number)
             elif order == "DS": # ALOKACJA PAMIĘCI BEZ WARTOSCI
-                MEMORY_LABELS[label] = len(MEMORY)
+                store_label(label)
                 for _ in range(count): MEMORY.append(None)
 
     elif match('^(L[AR]?|ST)\s+[0-9]+,\s+.+', line): # OPERACJE ŁADOWANIA Z I DO PAMIĘCI
         line = sub('[,\n]','', line).split()
         order = line[0]
         target = line[1]
-        source = line[2]
+        source = get_short_adress(line[2])
         if order == 'L': REGISTER[int(target)] = MEMORY[source]
-        elif order == 'LA': REGISTER[int(target)] = read_adress(source)
-        elif order == 'LR': REGISTER[int(target)] = REGISTER[int(source)]
-        elif order == 'ST': 
-            source = line[1]
-            target = line[2]
-            if match('^[A-Z_]+$', target): MEMORY[target] = REGISTER[int(source)]
-            elif match('^[0-9]+$', target): MEMORY[get_label(target)] = REGISTER[int(source)]
+        elif order == 'LA': REGISTER[int(target)] = source * WORD_LENGTH + MEMORY_START # ADRES OD POCZĄTKU W SŁOWACH
+        elif order == 'LR': REGISTER[int(target)] = REGISTER[int(line[2])]
+        elif order == 'ST': MEMORY[source] = REGISTER[int(target)]
     elif match('^[ASMDC]R?\s+[0-9]+,\s+.+', line): # OPERACJE ARYTMETYCZNE I PORÓWNANIA
         line = sub('[,\n]','', line).split()
         order = line[0]
@@ -79,7 +91,7 @@ def interpret(line):
         source = line[2]
         # SPRAWDZANIE CZY OPERACJA TYPU REJESTR - REJESTR
         if match('.R', order): source = REGISTER[int(source)]
-        else: source = MEMORY[source]
+        else: source = MEMORY[get_short_adress(line[2])]
         # ADD, SUBTRACT, MULTIPLY, DIVIDE
         if match('^A', order): REGISTER[int(target)] += source
         elif match('^S', order): REGISTER[int(target)] -= source
@@ -90,8 +102,8 @@ def interpret(line):
         if match('^C', order):
             target = REGISTER[int(target)]
             if target == source: STATE = 0b00
-            elif target < source: STATE = 0b01
-            elif target > source: STATE = 0b10
+            elif target < source: STATE = 0b10
+            elif target > source: STATE = 0b01
             else: STATE = 0b11
     elif match('^J[PNZ]?\s+[A-Z_]+', line): # OPERACJE SKOKU
         line = line.split()
@@ -120,28 +132,29 @@ def dump_all():
 
 def main():
     global program
-    program = open("testowy_program.txt", mode='r')
+    program = open("suma_wektora.txt", mode='r')
     # PREPROCESSING ETYKIET SKOKU
     while True:
         location = program.tell()
         line = program.readline().lstrip()
-        if match('^\s*$', line): break
+        if match('^\s*$', line): continue
         is_label = True
         for regex in ORDERS:
             if match(regex, line): 
                 is_label = False
                 break
+        print(line, is_label)
         if is_label: LABELS[line.split()[0]] = location
+        if match('^KONIEC$', line): break
     # WYZEROWANIE POZYCJI WSKAŹNIKA STRUMIENIA
     program.seek(0)
     # GŁÓWNA PĘTLA
     while True:
         line = program.readline()
         if match('^\s*$', line): continue
-        if match('\s*KONIEC\s*', line): break
+        if match('^KONIEC$', line): break
         print(line)
         interpret(line)
-        dump_all()
     dump_all()
     program.close()
 
