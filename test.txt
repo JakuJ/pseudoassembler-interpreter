@@ -1,0 +1,2 @@
+A	DC INTEGER (3)
+KONIEC

@@ -246,14 +246,15 @@ class Editor():
         self.editor.edit_redo()   
             
     def main(self, event=None):          
-        self.editor.bind("<Control-o>", self.file_open)
-        self.editor.bind("<Control-O>", self.file_open)
-        self.editor.bind("<Control-S>", self.file_save)
-        self.editor.bind("<Control-s>", self.file_save)
-        self.editor.bind("<Control-y>", self.redo)
-        self.editor.bind("<Control-Y>", self.redo)
-        self.editor.bind("<Control-Z>", self.undo)
-        self.editor.bind("<Control-z>", self.undo)
+        self.editor.bind("<Command-o>", self.file_open)
+        self.editor.bind("<Command-O>", self.file_open)
+        self.editor.bind("<Command-S>", self.file_save)
+        self.editor.bind("<Command-s>", self.file_save)
+        self.editor.bind("<Command-y>", self.redo)
+        self.editor.bind("<Command-Y>", self.redo)
+        self.editor.bind("<Command-Z>", self.undo)
+        self.editor.bind("<Command-z>", self.undo)
+        self.editor.bind("<Command-b>", run_code)
 class Output():
     def __init__(self, root, side, height = 20):
         self.root = root
@@ -267,7 +268,7 @@ class Output():
         self.field.insert("1.0", text)
         self.field.config(state = "disabled")
 
-def run_code():
+def run_code(event=None):
     global program
     editor.save_if_modified()
     program = open(editor.file_path, mode='r')
@@ -315,7 +316,6 @@ if __name__ == "__main__":
         pass 
     buttons = Frame(root)
     run_button = Button(buttons, text ="RUN CODE", command = run_code)
-    buttons.bind("<Control-b>", run_code)
     next_line_button = Button(buttons, text ="NEXT LINE", command = donothing, state="disabled")
     run_button.pack(side="left")
     next_line_button.pack(side="left")
