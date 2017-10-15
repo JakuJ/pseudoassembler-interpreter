@@ -14,6 +14,9 @@ MEMORY = []
 MEMORY_LABELS = dict()
 STATE = 0b00
 
+BY_LINE_MODE = False
+CURRENT_LINE = 1.0
+
 def set_state(target):
     global STATE
     if REGISTER[int(target)] == 0: STATE = 0b00
@@ -307,6 +310,30 @@ def run_code(event=None):
     dump_all()
     program.close()
 
+def run_by_line(event=None):
+    global BY_LINE_MODE, CURRENT_LINE
+    if not BY_LINE_MODE:
+        BY_LINE_MODE = True
+        run_by_line_button.config(text="EXIT BY LINE MODE")
+        next_line_button.config(state="normal")
+        next_line()
+    else:
+        BY_LINE_MODE = False
+        CURRENT_LINE = 1.0
+        run_by_line_button.config(text="RUN BY LINE")
+        next_line_button.config(state="disabled")
+
+
+def next_line(event=None):
+    # HIGHLIGHT CURRENT LINE AND REMOVE HIGHLIGHT FROM THE PREVIOUS ONE
+    global CURRENT_LINE
+    if CURRENT_LINE > 1:
+        editor.editor.tag_add("previous_line", str(CURRENT_LINE-1), str(CURRENT_LINE-1 + 0.71))
+        editor.editor.tag_config("previous_line", background="white", foreground="black")
+    editor.editor.tag_add("current_line", str(CURRENT_LINE), str(CURRENT_LINE + 0.71))
+    editor.editor.tag_config("current_line", background="black", foreground="white")
+    CURRENT_LINE += 1.0
+
 if __name__ == "__main__":
     # INICJALIZACJA OKNA
     global root
@@ -316,8 +343,10 @@ if __name__ == "__main__":
         pass 
     buttons = Frame(root)
     run_button = Button(buttons, text ="RUN CODE", command = run_code)
-    next_line_button = Button(buttons, text ="NEXT LINE", command = donothing, state="disabled")
+    run_by_line_button = Button(buttons, text="RUN BY LINE", command = run_by_line)
+    next_line_button = Button(buttons, text ="NEXT LINE", command = next_line, state="disabled")
     run_button.pack(side="left")
+    run_by_line_button.pack(side="left")
     next_line_button.pack(side="left")
     buttons.pack(side="top", fill="x")
     # POLA TEKSTOWE
