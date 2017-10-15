@@ -17,6 +17,31 @@ STATE = 0b00
 BY_LINE_MODE = False
 CURRENT_LINE = 1.0
 
+def reset_state():
+    global REGISTER, MEMORY, STATE, MEMORY_LABELS, LABELS
+    LABELS = dict()
+    REGISTER = [None] * 14 + [MEMORY_START,0]
+    MEMORY = []
+    MEMORY_LABELS = dict()
+    STATE = 0b00
+
+def preprocess_labels():
+    # PREPROCESSING ETYKIET SKOKU
+    global ORDERS, LABELS
+    while True:
+        location = program.tell()
+        line = program.readline().lstrip()
+        line = sub('\#.*', '', line)
+        if match('^\s*$', line): continue
+        is_label = True
+        for regex in ORDERS:
+            if match(regex, line): 
+                is_label = False
+                break
+        print(line, is_label)
+        if is_label: LABELS[line.split()[0]] = location
+        if match('^\s*KONIEC\s*$', line): break
+
 def set_state(target):
     global STATE
     if REGISTER[int(target)] == 0: STATE = 0b00
@@ -117,7 +142,8 @@ def interpret(line):
         line = line.split()
         order = line[0]
         label = sub('\n','',line[1])
-        if order == "J": program.seek(LABELS[label])
+        if order == "J":
+            program.seek(LABELS[label])
         elif order == "JP":
             if STATE == 0b01: program.seek(LABELS[label])
         elif order == "JN":
@@ -275,27 +301,8 @@ def run_code(event=None):
     global program
     editor.save_if_modified()
     program = open(editor.file_path, mode='r')
-    # ZEROWANIE STANU KOMPUTERA
-    global REGISTER, MEMORY, STATE, MEMORY_LABELS, LABELS
-    LABELS = dict()
-    REGISTER = [None] * 14 + [MEMORY_START,0]
-    MEMORY = []
-    MEMORY_LABELS = dict()
-    STATE = 0b00
-    # PREPROCESSING ETYKIET SKOKU
-    while True:
-        location = program.tell()
-        line = program.readline().lstrip()
-        line = sub('\#.*', '', line)
-        if match('^\s*$', line): continue
-        is_label = True
-        for regex in ORDERS:
-            if match(regex, line): 
-                is_label = False
-                break
-        print(line, is_label)
-        if is_label: LABELS[line.split()[0]] = location
-        if match('^\s*KONIEC\s*$', line): break
+    reset_state()
+    preprocess_labels()
     # WYZEROWANIE POZYCJI WSKAŹNIKA STRUMIENIA
     program.seek(0)
     # GŁÓWNA PĘTLA
@@ -316,23 +323,40 @@ def run_by_line(event=None):
         BY_LINE_MODE = True
         run_by_line_button.config(text="EXIT BY LINE MODE")
         next_line_button.config(state="normal")
+        # SET STATE
+        global program
+        editor.save_if_modified()
+        program = open(editor.file_path, mode='r')
+        reset_state()
+        preprocess_labels()
+        program.seek(0)
         next_line()
     else:
         BY_LINE_MODE = False
         CURRENT_LINE = 1.0
         run_by_line_button.config(text="RUN BY LINE")
         next_line_button.config(state="disabled")
-
+        editor.editor.tag_add("cleansing", "1.0", END)
+        editor.editor.tag_config("cleansing", background="white", foreground="black")
 
 def next_line(event=None):
     # HIGHLIGHT CURRENT LINE AND REMOVE HIGHLIGHT FROM THE PREVIOUS ONE
-    global CURRENT_LINE
+    global CURRENT_LINE, program
     if CURRENT_LINE > 1:
         editor.editor.tag_add("previous_line", str(CURRENT_LINE-1), str(CURRENT_LINE-1 + 0.71))
         editor.editor.tag_config("previous_line", background="white", foreground="black")
     editor.editor.tag_add("current_line", str(CURRENT_LINE), str(CURRENT_LINE + 0.71))
     editor.editor.tag_config("current_line", background="black", foreground="white")
     CURRENT_LINE += 1.0
+    # PROCESS LINE
+    line = program.readline()
+    # USUWANIE KOMENTARZY
+    line = sub('\#.+', '', line)
+    #if match('^\s*$', line): continue
+    #if match('^\s*KONIEC\s*$', line): break
+    print(line)
+    interpret(line)
+    dump_all()
 
 if __name__ == "__main__":
     # INICJALIZACJA OKNA
