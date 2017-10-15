@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 from re import match, sub
+from tkinter import Tk, Text, Scrollbar, Menu, messagebox, filedialog, BooleanVar, Checkbutton, Label, Entry, StringVar, Grid, Frame, Button, END
+import os, subprocess, json, string
 
 MEMORY_START = 1000
 WORD_LENGTH = 4
@@ -9,7 +12,7 @@ LABELS = dict()
 REGISTER = [None] * 14 + [MEMORY_START,0]
 MEMORY = []
 MEMORY_LABELS = dict()
-STATE = 0
+STATE = 0b00
 
 def set_state(target):
     global STATE
@@ -33,7 +36,8 @@ def store_label(label):
 
 def get_label(input_adress):
     for label, adress in MEMORY_LABELS.items():
-        if adress == input_adress: return adress
+        if adress == input_adress: return label
+    return ""
 
 def interpret(line):
     global STATE, REGISTER, MEMORY, LABELS, ORDERS
@@ -119,21 +123,161 @@ def interpret(line):
             if STATE == 0b00: program.seek(LABELS[label])
                 
 def dump_all():
-    print("-" * 30)
-    print("LABELS:")
-    print(LABELS)
-    print("REGISTER:")
-    print(REGISTER)
-    print("MEMORY LABELS:")
-    print(MEMORY_LABELS)
-    print("MEMORY:")
-    print(MEMORY)
-    print("STATE: ", STATE)
-    print("-" * 30)
+    # DRUKOWANIE ZAWARTOSCI REJESTRÓW
+    registers_text = "REGISTERS:\n"
+    for x in range(len(REGISTER)):
+        registers_text = registers_text + str(x) + ":" + str(REGISTER[x]) + "\n"
+    registers.print_output(registers_text)
+    # DRUKOWANIE ZAWARTOSCI PAMIĘCI
+    memory_text = "MEMORY:\n"
+    for x in range(len(MEMORY)):
+        memory_text = memory_text + str(x * WORD_LENGTH + MEMORY_START) + ":" + str(MEMORY[x]) + "  <" + get_label(x * WORD_LENGTH + MEMORY_START) + ">\n"
+    memory.print_output(memory_text)
 
-def main():
+class Editor():
+    def __init__(self, root):
+        self.root = root        
+        self.TITLE = "Pseudoassembler IDE"
+        self.file_path = None
+        self.set_title()
+        
+        frame = Frame(root)
+        self.yscrollbar = Scrollbar(frame, orient="vertical")
+        self.editor = Text(frame, yscrollcommand=self.yscrollbar.set)
+        self.editor.pack(side="left", fill="y", expand=1)
+        self.editor.config( wrap = "word", # use word wrapping
+               undo = True, # Tk 8.4 
+               width = 80 )        
+        self.editor.focus()     
+        frame.pack(side="left", fill="y", expand=1)
+
+        #instead of closing the window, execute a function
+        root.protocol("WM_DELETE_WINDOW", self.file_quit) 
+
+        #create a top level menu
+        self.menubar = Menu(root)
+        #Menu item File
+        filemenu = Menu(self.menubar, tearoff=0)# tearoff = 0 => can't be seperated from window
+        filemenu.add_command(label="New", underline=1, command=self.file_new, accelerator="Ctrl+N")
+        filemenu.add_command(label="Open...", underline=1, command=self.file_open, accelerator="Ctrl+O")
+        filemenu.add_command(label="Save", underline=1, command=self.file_save, accelerator="Ctrl+S")
+        filemenu.add_command(label="Save As...", underline=5, command=self.file_save_as, accelerator="Ctrl+Alt+S")
+        filemenu.add_separator()
+        filemenu.add_command(label="Exit", underline=2, command=self.file_quit, accelerator="Alt+F4")
+        self.menubar.add_cascade(label="File", underline=0, menu=filemenu)        
+        # display the menu
+        root.config(menu=self.menubar)
+    def save_if_modified(self, event=None):
+        if self.editor.edit_modified(): #modified
+            response = messagebox.askyesnocancel("Save?", "This document has been modified. Do you want to save changes?") #yes = True, no = False, cancel = None
+            if response: #yes/save
+                result = self.file_save()
+                if result == "saved": #saved
+                    return True
+                else: #save cancelled
+                    return None
+            else:
+                return response #None = cancel/abort, False = no/discard
+        else: #not modified
+            return True
+    
+    def file_new(self, event=None):
+        result = self.save_if_modified()
+        if result != None: #None => Aborted or Save cancelled, False => Discarded, True = Saved or Not modified
+            self.editor.delete(1.0, "end")
+            self.editor.edit_modified(False)
+            self.editor.edit_reset()
+            self.file_path = None
+            self.set_title()
+            
+
+    def file_open(self, event=None, filepath=None):
+        result = self.save_if_modified()
+        if result != None: #None => Aborted or Save cancelled, False => Discarded, True = Saved or Not modified
+            if filepath == None:
+                filepath = filedialog.askopenfilename()
+            if filepath != None  and filepath != '':
+                with open(filepath, encoding="utf-8") as f:
+                    fileContents = f.read()# Get all the text from file.           
+                # Set current text to file contents
+                self.editor.delete(1.0, "end")
+                self.editor.insert(1.0, fileContents)
+                self.editor.edit_modified(False)
+                self.file_path = filepath
+
+    def file_save(self, event=None):
+        if self.file_path == None:
+            result = self.file_save_as()
+        else:
+            result = self.file_save_as(filepath=self.file_path)
+        return result
+
+    def file_save_as(self, event=None, filepath=None):
+        if filepath == None:
+            filepath = filedialog.asksaveasfilename(filetypes=(('Text files', '*.txt'), ('Python files', '*.py *.pyw'), ('All files', '*.*'))) #defaultextension='.txt'
+        try:
+            with open(filepath, 'wb') as f:
+                text = self.editor.get(1.0, "end-1c")
+                f.write(bytes(text, 'UTF-8'))
+                self.editor.edit_modified(False)
+                self.file_path = filepath
+                self.set_title()
+                return "saved"
+        except FileNotFoundError:
+            print('FileNotFoundError')
+            return "cancelled"
+
+    def file_quit(self, event=None):
+        result = self.save_if_modified()
+        if result != None: #None => Aborted or Save cancelled, False => Discarded, True = Saved or Not modified
+            self.root.destroy() #sys.exit(0)
+
+    def set_title(self, event=None):
+        if self.file_path != None:
+            title = os.path.basename(self.file_path)
+        else:
+            title = "Untitled"
+        self.root.title(title + " - " + self.TITLE)
+        
+    def undo(self, event=None):
+        self.editor.edit_undo()
+        
+    def redo(self, event=None):
+        self.editor.edit_redo()   
+            
+    def main(self, event=None):          
+        self.editor.bind("<Control-o>", self.file_open)
+        self.editor.bind("<Control-O>", self.file_open)
+        self.editor.bind("<Control-S>", self.file_save)
+        self.editor.bind("<Control-s>", self.file_save)
+        self.editor.bind("<Control-y>", self.redo)
+        self.editor.bind("<Control-Y>", self.redo)
+        self.editor.bind("<Control-Z>", self.undo)
+        self.editor.bind("<Control-z>", self.undo)
+class Output():
+    def __init__(self, root, side, height = 20):
+        self.root = root
+        self.yscroll = Scrollbar(self.root, orient="vertical")
+        self.field = Text(self.root, height = height, width = 50, yscrollcommand=self.yscroll.set)
+        self.field.config(state = "disabled")
+        self.field.pack(side=side)
+    def print_output(self, text):
+        self.field.config(state = "normal")
+        self.field.delete("1.0", END)
+        self.field.insert("1.0", text)
+        self.field.config(state = "disabled")
+
+def run_code():
     global program
-    program = open("nwd.txt", mode='r')
+    editor.save_if_modified()
+    program = open(editor.file_path, mode='r')
+    # ZEROWANIE STANU KOMPUTERA
+    global REGISTER, MEMORY, STATE, MEMORY_LABELS, LABELS
+    LABELS = dict()
+    REGISTER = [None] * 14 + [MEMORY_START,0]
+    MEMORY = []
+    MEMORY_LABELS = dict()
+    STATE = 0b00
     # PREPROCESSING ETYKIET SKOKU
     while True:
         location = program.tell()
@@ -162,4 +306,27 @@ def main():
     dump_all()
     program.close()
 
-main()
+if __name__ == "__main__":
+    # INICJALIZACJA OKNA
+    global root
+    root = Tk("IDE Window")
+    # PRZYCISKI
+    def donothing():
+        pass 
+    buttons = Frame(root)
+    run_button = Button(buttons, text ="RUN CODE", command = run_code)
+    buttons.bind("<Control-b>", run_code)
+    next_line_button = Button(buttons, text ="NEXT LINE", command = donothing, state="disabled")
+    run_button.pack(side="left")
+    next_line_button.pack(side="left")
+    buttons.pack(side="top", fill="x")
+    # POLA TEKSTOWE
+    editor = Editor(root)
+    editor.main()
+    registers = Output(root, "top")
+    memory = Output(root, "bottom")
+    registers.print_output("REGISTERS:")
+    memory.print_output("MEMORY_DUMP:")
+    # GŁÓWNA PĘTLA PROGRAMU
+    dump_all()
+    root.mainloop()
