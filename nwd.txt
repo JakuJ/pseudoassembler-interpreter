@@ -1,4 +1,4 @@
-A       DC INTEGER (398)
+A       DC INTEGER (165)
 B       DC INTEGER (1200)
 WYNIK   DS INTEGER
 

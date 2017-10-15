@@ -3,20 +3,21 @@
 from re import match, sub
 from tkinter import Tk, Text, Scrollbar, Menu, messagebox, filedialog, BooleanVar, Checkbutton, Label, Entry, StringVar, Grid, Frame, Button, END
 import os, subprocess, json, string
-
+# MEMORY START ADRESS AND WORD LENGTH IN BYTES
 MEMORY_START = 1000
 WORD_LENGTH = 4
-
+# ORDER RECOGNITION REGULAR EXPRESSIONS
 ORDERS = ['^J[PNZ]?\s+.+', '^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', '^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', '^[ASMDC]R?\s+[0-9]+\s*,\s*.+']
+# COMPUTER STATE CONTAINERS
 LABELS = dict()
 REGISTER = [None] * 14 + [MEMORY_START,0]
 MEMORY = []
 MEMORY_LABELS = dict()
 STATE = 0b00
-
+# <BY_LINE_MODE> VARIABLES
 BY_LINE_MODE = False
 CURRENT_LINE = 1.0
-
+# RESET COMPUTER STATE
 def reset_state():
     global REGISTER, MEMORY, STATE, MEMORY_LABELS, LABELS
     LABELS = dict()
@@ -24,11 +25,13 @@ def reset_state():
     MEMORY = []
     MEMORY_LABELS = dict()
     STATE = 0b00
-
+# GET ALL JUMP LABELS FROM THE CODE
 def preprocess_labels():
     # PREPROCESSING ETYKIET SKOKU
-    global ORDERS, LABELS
+    global ORDERS, LABELS, CURRENT_LINE
+    CURRENT_LINE = 0.0
     while True:
+        CURRENT_LINE += 1.0
         location = program.tell()
         line = program.readline().lstrip()
         line = sub('\#.*', '', line)
@@ -38,17 +41,16 @@ def preprocess_labels():
             if match(regex, line): 
                 is_label = False
                 break
-        print(line, is_label)
-        if is_label: LABELS[line.split()[0]] = location
+        if is_label: LABELS[line.split()[0]] = (location, CURRENT_LINE)
         if match('^\s*KONIEC\s*$', line): break
-
+# SET PROGRAM STATE BITS (0b00 etc.)
 def set_state(target):
     global STATE
     if REGISTER[int(target)] == 0: STATE = 0b00
     elif REGISTER[int(target)] > 0: STATE = 0b01
     elif REGISTER[int(target)] < 0: STATE = 0b10
     else: STATE = 0b11
-
+# TRANSFORM FULL MEMORY CELL ADRESS INTO PYTHON LIST ONE
 def get_short_adress(label):
     if match('^[A-Z_]+$', label): return (MEMORY_LABELS[label] - MEMORY_START) // WORD_LENGTH # ETYKIETA
     elif match('^[0-9]+$', label): return (int(label) - MEMORY_START) // WORD_LENGTH # ADRES
@@ -57,22 +59,21 @@ def get_short_adress(label):
         delta = int(label[0])
         register = int(label[1])
         return get_short_adress(str(REGISTER[register] + delta))
-
+# STORE FULL MEMORY CELL ADRESS IN LABEL DICTIONARY
 def store_label(label):
     global MEMORY, MEMORY_LABELS, MEMORY_START
     MEMORY_LABELS[label] = len(MEMORY) * WORD_LENGTH + MEMORY_START
-
+# CHECK IF THERE IS A LABEL AT A SPECIFIC MEMORY ADRESS
 def get_label(input_adress):
     for label, adress in MEMORY_LABELS.items():
         if adress == input_adress: return label
     return ""
-
+# INTERPRET A LINE OF CODE
 def interpret(line):
-    global STATE, REGISTER, MEMORY, LABELS, ORDERS
+    global STATE, REGISTER, MEMORY, LABELS, ORDERS, CURRENT_LINE
     # IGNORUJ ETYKIETY
     has_label = True
     line = line.lstrip().rstrip() # OBETNIJ Z BIAŁYCH ZNAKÓW
-    print("Line before: ", line)
     for regex in ORDERS:
         if match(regex, line): 
             has_label = False
@@ -81,7 +82,6 @@ def interpret(line):
         line = line.split()
         line.pop(0)
         line = ' '.join(line).lstrip()
-        print("Line after: ", line)
     # WŁASCIWE INSTRUKCJE
     if match('^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', line): # DYREKTYWY DEKLARACJI ZMIENNYCH
         if match('^[A-Z_]+\s+D[CS]\s+INTEGER', line): # POJEDYŃCZE ZMIENNE
@@ -143,14 +143,21 @@ def interpret(line):
         order = line[0]
         label = sub('\n','',line[1])
         if order == "J":
-            program.seek(LABELS[label])
+            program.seek(LABELS[label][0])
+            CURRENT_LINE = LABELS[label][1]
         elif order == "JP":
-            if STATE == 0b01: program.seek(LABELS[label])
+            if STATE == 0b01:
+                program.seek(LABELS[label][0])
+                CURRENT_LINE = LABELS[label][1]
         elif order == "JN":
-            if STATE == 0b10: program.seek(LABELS[label])
+            if STATE == 0b10:
+                program.seek(LABELS[label][0])
+                CURRENT_LINE = LABELS[label][1]
         elif order == "JZ":
-            if STATE == 0b00: program.seek(LABELS[label])
-                
+            if STATE == 0b00:
+                program.seek(LABELS[label][0])
+                CURRENT_LINE = LABELS[label][1]
+# PRINT ALL INFORMATION TO THE OUTPUT TEXT FIELDS             
 def dump_all():
     # DRUKOWANIE ZAWARTOSCI REJESTRÓW
     registers_text = "REGISTERS:\n"
@@ -162,7 +169,11 @@ def dump_all():
     for x in range(len(MEMORY)):
         memory_text = memory_text + str(x * WORD_LENGTH + MEMORY_START) + ":" + str(MEMORY[x]) + "  <" + get_label(x * WORD_LENGTH + MEMORY_START) + ">\n"
     memory.print_output(memory_text)
+# TRANSLATE DECIMAL TO TWO'S COMPLEMENT BINARY
+def int_to_u2(integer):
+    pass
 
+# EDITOR TEXTBOX CLASS (ALSO, MENU)
 class Editor():
     def __init__(self, root):
         self.root = root        
@@ -172,12 +183,12 @@ class Editor():
         
         frame = Frame(root)
         self.yscrollbar = Scrollbar(frame, orient="vertical")
-        self.editor = Text(frame, yscrollcommand=self.yscrollbar.set)
+        self.editor = Text(frame, yscrollcommand=self.yscrollbar.set, bg="white", cursor="xterm")
         self.editor.pack(side="left", fill="y", expand=1)
         self.editor.config( wrap = "word", # use word wrapping
                undo = True, # Tk 8.4 
                width = 80 )        
-        self.editor.focus()     
+        self.editor.focus()  
         frame.pack(side="left", fill="y", expand=1)
 
         #instead of closing the window, execute a function
@@ -196,6 +207,7 @@ class Editor():
         self.menubar.add_cascade(label="File", underline=0, menu=filemenu)        
         # display the menu
         root.config(menu=self.menubar)
+    
     def save_if_modified(self, event=None):
         if self.editor.edit_modified(): #modified
             response = messagebox.askyesnocancel("Save?", "This document has been modified. Do you want to save changes?") #yes = True, no = False, cancel = None
@@ -219,7 +231,6 @@ class Editor():
             self.file_path = None
             self.set_title()
             
-
     def file_open(self, event=None, filepath=None):
         result = self.save_if_modified()
         if result != None: #None => Aborted or Save cancelled, False => Discarded, True = Saved or Not modified
@@ -284,11 +295,12 @@ class Editor():
         self.editor.bind("<Command-Z>", self.undo)
         self.editor.bind("<Command-z>", self.undo)
         self.editor.bind("<Command-b>", run_code)
+# OUTPUT TEXTBOXES CLASS
 class Output():
     def __init__(self, root, side, height = 20):
         self.root = root
         self.yscroll = Scrollbar(self.root, orient="vertical")
-        self.field = Text(self.root, height = height, width = 50, yscrollcommand=self.yscroll.set)
+        self.field = Text(self.root, height = height, width = 50, yscrollcommand=self.yscroll.set, cursor="arrow")
         self.field.config(state = "disabled")
         self.field.pack(side=side)
     def print_output(self, text):
@@ -296,7 +308,7 @@ class Output():
         self.field.delete("1.0", END)
         self.field.insert("1.0", text)
         self.field.config(state = "disabled")
-
+# RUN ALL OF THE CODE AT ONCE
 def run_code(event=None):
     global program
     editor.save_if_modified()
@@ -316,55 +328,54 @@ def run_code(event=None):
         interpret(line)
     dump_all()
     program.close()
-
+# TOGGLE <RUN_BY_LINE> MODE
 def run_by_line(event=None):
-    global BY_LINE_MODE, CURRENT_LINE
+    global BY_LINE_MODE, CURRENT_LINE, program
     if not BY_LINE_MODE:
         BY_LINE_MODE = True
         run_by_line_button.config(text="EXIT BY LINE MODE")
         next_line_button.config(state="normal")
+        run_button.config(state="disabled")
         # SET STATE
-        global program
         editor.save_if_modified()
         program = open(editor.file_path, mode='r')
         reset_state()
         preprocess_labels()
         program.seek(0)
+        CURRENT_LINE = 1.0
         next_line()
     else:
         BY_LINE_MODE = False
         CURRENT_LINE = 1.0
         run_by_line_button.config(text="RUN BY LINE")
         next_line_button.config(state="disabled")
-        editor.editor.tag_add("cleansing", "1.0", END)
-        editor.editor.tag_config("cleansing", background="white", foreground="black")
-
+        run_button.config(state="normal")
+        reset_state()
+        # CLEAR HIGHLIGHTING
+        editor.editor.tag_remove("current_line", "1.0", END)
+# PROCESS NEXT LINE IN <RUN_BY_LINE> MODE
 def next_line(event=None):
-    # HIGHLIGHT CURRENT LINE AND REMOVE HIGHLIGHT FROM THE PREVIOUS ONE
-    global CURRENT_LINE, program
-    if CURRENT_LINE > 1:
-        editor.editor.tag_add("previous_line", str(CURRENT_LINE-1), str(CURRENT_LINE-1 + 0.71))
-        editor.editor.tag_config("previous_line", background="white", foreground="black")
+    global CURRENT_LINE, BY_LINE_MODE, program
+    # HIGHLIGHT CURRENT LINE AND REMOVE HIGHLIGHT FROM ALL OTHER
     editor.editor.tag_add("current_line", str(CURRENT_LINE), str(CURRENT_LINE + 0.71))
     editor.editor.tag_config("current_line", background="black", foreground="white")
-    CURRENT_LINE += 1.0
+    editor.editor.tag_remove("current_line", "1.0", str(CURRENT_LINE))
+    editor.editor.tag_remove("current_line", str(CURRENT_LINE + 0.71), END)
     # PROCESS LINE
+    CURRENT_LINE += 1.0
     line = program.readline()
-    # USUWANIE KOMENTARZY
     line = sub('\#.+', '', line)
-    #if match('^\s*$', line): continue
-    #if match('^\s*KONIEC\s*$', line): break
-    print(line)
+    if match('^\s*KONIEC\s*$', line):
+        run_by_line()
+        return
     interpret(line)
     dump_all()
-
+# MAIN PROGRAM FUNCTION
 if __name__ == "__main__":
     # INICJALIZACJA OKNA
     global root
     root = Tk("IDE Window")
     # PRZYCISKI
-    def donothing():
-        pass 
     buttons = Frame(root)
     run_button = Button(buttons, text ="RUN CODE", command = run_code)
     run_by_line_button = Button(buttons, text="RUN BY LINE", command = run_by_line)
