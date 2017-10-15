@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from re import match, sub
-from tkinter import Tk, Text, Scrollbar, Menu, messagebox, filedialog, BooleanVar, Checkbutton, Label, Entry, StringVar, Grid, Frame, Button, END
+from tkinter import Tk, Text, Scrollbar, Menu, messagebox, filedialog, BooleanVar, Checkbutton, Label, Entry, StringVar, Frame, Button, END
 import os, subprocess, json, string
 # MEMORY START ADRESS AND WORD LENGTH IN BYTES
 MEMORY_START = 1000
@@ -160,15 +160,17 @@ def interpret(line):
                 CURRENT_LINE = LABELS[label][1]
 # PRINT ALL INFORMATION TO THE OUTPUT TEXT FIELDS             
 def dump_all():
-    # DRUKOWANIE ZAWARTOSCI REJESTRÓW
-    registers_text = "REGISTERS:\n"
+    # DRUKOWANIE WARTOSCI SŁOWA STANU PROGRAMU ORAZ ZAWARTOSCI REJESTRÓW
+    formated_state = bin(STATE).split('b')[1]
+    if STATE <2: formated_state = '0' + formated_state
+    registers_text = "STATE:\t" + formated_state +  "\nREGISTERS:\nINDEX\tVALUE\tTWO'S COMPLEMENT\n"
     for x in range(len(REGISTER)):
-        registers_text = registers_text + str(x) + ":\t" + str(REGISTER[x]) + "\t" + int_to_u2(REGISTER[x]) + "\n"
+        registers_text = registers_text + str(x) + "\t" + str(REGISTER[x]) + "\t" + int_to_u2(REGISTER[x]) + "\n"
     registers.print_output(registers_text)
     # DRUKOWANIE ZAWARTOSCI PAMIĘCI
-    memory_text = "MEMORY:\tVALUE:\tLABEL:\tU2:\n"
+    memory_text = "MEMORY:\nADRESS\tVALUE:\tLABEL:\tTWO'S COMPLEMENT:\n"
     for x in range(len(MEMORY)):
-        memory_text = memory_text + str(x * WORD_LENGTH + MEMORY_START) + ":\t" + str(MEMORY[x]) + "\t<" + get_label(x * WORD_LENGTH + MEMORY_START) + ">\t" + int_to_u2(MEMORY[x]) +"\n"
+        memory_text = memory_text + str(x * WORD_LENGTH + MEMORY_START) + "\t" + str(MEMORY[x]) + "\t" + get_label(x * WORD_LENGTH + MEMORY_START) + "\t" + int_to_u2(MEMORY[x]) +"\n"
     memory.print_output(memory_text)
 # TRANSLATE DECIMAL TO TWO'S COMPLEMENT BINARY
 def int_to_u2(integer):
@@ -187,21 +189,26 @@ class Editor():
         
         frame = Frame(root)
         self.yscrollbar = Scrollbar(frame, orient="vertical")
-        self.editor = Text(frame, yscrollcommand=self.yscrollbar.set, bg="white", cursor="xterm")
-        self.editor.pack(side="left", fill="y", expand=1)
-        self.editor.config( wrap = "word", # use word wrapping
-               undo = True, # Tk 8.4 
+        self.xscrollbar = Scrollbar(frame, orient="horizontal")
+        self.editor = Text(frame, yscrollcommand=self.yscrollbar.set, xscrollcommand=self.xscrollbar.set, bg="white", cursor="xterm")
+        self.xscrollbar.pack(side="top", fill="x")
+        self.xscrollbar.config(command=self.editor.xview)
+        self.yscrollbar.pack(side="right", fill="y")
+        self.yscrollbar.config(command=self.editor.yview)
+        self.editor.pack(side="top", fill="y", expand=1)
+        self.editor.config(wrap = "none",
+               undo = True,
                width = EDITOR_WIDTH)
-        self.editor.focus()  
-        frame.pack(side="left", fill="y", expand=1)
+        self.editor.focus() 
+        frame.pack(side="left", fill="both", expand=0)
 
-        #instead of closing the window, execute a function
+        # EXECUTE A FUNCTION INSTEAD OF CLOSING THE WINDOW
         root.protocol("WM_DELETE_WINDOW", self.file_quit) 
 
-        #create a top level menu
+        # TOP LEVEL MENU
         self.menubar = Menu(root)
-        #Menu item File
-        filemenu = Menu(self.menubar, tearoff=0)# tearoff = 0 => can't be seperated from window
+        # MENU ITEM FILE
+        filemenu = Menu(self.menubar, tearoff=0) # teardown = 0 -> can't be separated from window
         filemenu.add_command(label="New", underline=1, command=self.file_new, accelerator="Ctrl+N")
         filemenu.add_command(label="Open...", underline=1, command=self.file_open, accelerator="Ctrl+O")
         filemenu.add_command(label="Save", underline=1, command=self.file_save, accelerator="Ctrl+S")
@@ -209,26 +216,26 @@ class Editor():
         filemenu.add_separator()
         filemenu.add_command(label="Exit", underline=2, command=self.file_quit, accelerator="Alt+F4")
         self.menubar.add_cascade(label="File", underline=0, menu=filemenu)        
-        # display the menu
+        # DISPLAY THE MENU
         root.config(menu=self.menubar)
     
     def save_if_modified(self, event=None):
-        if self.editor.edit_modified(): #modified
-            response = messagebox.askyesnocancel("Save?", "This document has been modified. Do you want to save changes?") #yes = True, no = False, cancel = None
-            if response: #yes/save
+        if self.editor.edit_modified(): # modified
+            response = messagebox.askyesnocancel("Save?", "This document has been modified. Do you want to save changes?") # yes = True, no = False, cancel = None
+            if response: # yes/save
                 result = self.file_save()
-                if result == "saved": #saved
+                if result == "saved": # saved
                     return True
-                else: #save cancelled
+                else: # save cancelled
                     return None
             else:
-                return response #None = cancel/abort, False = no/discard
-        else: #not modified
+                return response # None = cancel/abort, False = no/discard
+        else: # not modified
             return True
     
     def file_new(self, event=None):
         result = self.save_if_modified()
-        if result != None: #None => Aborted or Save cancelled, False => Discarded, True = Saved or Not modified
+        if result != None: # None => Aborted or Save cancelled, False => Discarded, True = Saved or Not modified
             self.editor.delete(1.0, "end")
             self.editor.edit_modified(False)
             self.editor.edit_reset()
@@ -237,17 +244,18 @@ class Editor():
             
     def file_open(self, event=None, filepath=None):
         result = self.save_if_modified()
-        if result != None: #None => Aborted or Save cancelled, False => Discarded, True = Saved or Not modified
+        if result != None: # None => Aborted or Save cancelled, False => Discarded, True = Saved or Not modified
             if filepath == None:
                 filepath = filedialog.askopenfilename()
             if filepath != None  and filepath != '':
                 with open(filepath, encoding="utf-8") as f:
                     fileContents = f.read()# Get all the text from file.           
-                # Set current text to file contents
+                # SET CURRENT TEXT TO FILE CONTENTS
                 self.editor.delete(1.0, "end")
                 self.editor.insert(1.0, fileContents)
                 self.editor.edit_modified(False)
                 self.file_path = filepath
+                self.set_title()
 
     def file_save(self, event=None):
         if self.file_path == None:
@@ -298,13 +306,13 @@ class Editor():
         self.editor.bind("<Command-Y>", self.redo)
         self.editor.bind("<Command-Z>", self.undo)
         self.editor.bind("<Command-z>", self.undo)
-        self.editor.bind("<Command-b>", run_code)
+        self.editor.bind("<Command-b>", run_code) # global?
 # OUTPUT TEXTBOXES CLASS
 class Output():
     def __init__(self, root, side, height = 20):
         self.root = root
         self.yscroll = Scrollbar(self.root, orient="vertical")
-        self.field = Text(self.root, height = height, width = 50, yscrollcommand=self.yscroll.set, cursor="arrow")
+        self.field = Text(self.root, height = height, width = 60, yscrollcommand=self.yscroll.set, cursor="arrow")
         self.field.config(state = "disabled")
         self.field.pack(side=side, fill="x", expand=1)
     def print_output(self, text):
@@ -376,10 +384,10 @@ def next_line(event=None):
     dump_all()
 # MAIN PROGRAM FUNCTION
 if __name__ == "__main__":
-    # INICJALIZACJA OKNA
+    # INITIALIZE WINDOW
     global root
     root = Tk("IDE Window")
-    # PRZYCISKI
+    # BUTTONS
     buttons = Frame(root)
     run_button = Button(buttons, text ="RUN CODE", command = run_code)
     run_by_line_button = Button(buttons, text="RUN BY LINE", command = run_by_line)
@@ -388,14 +396,11 @@ if __name__ == "__main__":
     run_by_line_button.pack(side="left")
     next_line_button.pack(side="left")
     buttons.pack(side="top", fill="x")
-    # POLA TEKSTOWE
+    # TEXT FIELDS
     editor = Editor(root)
     editor.main()
     registers = Output(root, "top")
-    memory = Output(root, "bottom")
-    registers.print_output("REGISTERS:")
-    memory.print_output("MEMORY_DUMP:")
-    # GŁÓWNA PĘTLA PROGRAMU
+    memory = Output(root, "bottom", 10)
+    # MAIN PROGRAM LOOP
     dump_all()
-    print(int_to_u2(10))
     root.mainloop()
