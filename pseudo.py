@@ -17,6 +17,7 @@ STATE = 0b00
 # <BY_LINE_MODE> VARIABLES
 BY_LINE_MODE = False
 CURRENT_LINE = 1.0
+EDITOR_WIDTH = 51
 # RESET COMPUTER STATE
 def reset_state():
     global REGISTER, MEMORY, STATE, MEMORY_LABELS, LABELS
@@ -162,17 +163,20 @@ def dump_all():
     # DRUKOWANIE ZAWARTOSCI REJESTRÓW
     registers_text = "REGISTERS:\n"
     for x in range(len(REGISTER)):
-        registers_text = registers_text + str(x) + ":" + str(REGISTER[x]) + "\n"
+        registers_text = registers_text + str(x) + ":\t" + str(REGISTER[x]) + "\t" + int_to_u2(REGISTER[x]) + "\n"
     registers.print_output(registers_text)
     # DRUKOWANIE ZAWARTOSCI PAMIĘCI
-    memory_text = "MEMORY:\n"
+    memory_text = "MEMORY:\tVALUE:\tLABEL:\tU2:\n"
     for x in range(len(MEMORY)):
-        memory_text = memory_text + str(x * WORD_LENGTH + MEMORY_START) + ":" + str(MEMORY[x]) + "  <" + get_label(x * WORD_LENGTH + MEMORY_START) + ">\n"
+        memory_text = memory_text + str(x * WORD_LENGTH + MEMORY_START) + ":\t" + str(MEMORY[x]) + "\t<" + get_label(x * WORD_LENGTH + MEMORY_START) + ">\t" + int_to_u2(MEMORY[x]) +"\n"
     memory.print_output(memory_text)
 # TRANSLATE DECIMAL TO TWO'S COMPLEMENT BINARY
 def int_to_u2(integer):
-    pass
-
+    if integer == None: return ""
+    binary = bin(integer % (1<<32)).split('b')[1]
+    if integer >= 0:
+        for i in range(8*WORD_LENGTH - len(binary)): binary= '0' + binary
+    return binary      
 # EDITOR TEXTBOX CLASS (ALSO, MENU)
 class Editor():
     def __init__(self, root):
@@ -187,7 +191,7 @@ class Editor():
         self.editor.pack(side="left", fill="y", expand=1)
         self.editor.config( wrap = "word", # use word wrapping
                undo = True, # Tk 8.4 
-               width = 80 )        
+               width = EDITOR_WIDTH)
         self.editor.focus()  
         frame.pack(side="left", fill="y", expand=1)
 
@@ -302,7 +306,7 @@ class Output():
         self.yscroll = Scrollbar(self.root, orient="vertical")
         self.field = Text(self.root, height = height, width = 50, yscrollcommand=self.yscroll.set, cursor="arrow")
         self.field.config(state = "disabled")
-        self.field.pack(side=side)
+        self.field.pack(side=side, fill="x", expand=1)
     def print_output(self, text):
         self.field.config(state = "normal")
         self.field.delete("1.0", END)
@@ -357,10 +361,10 @@ def run_by_line(event=None):
 def next_line(event=None):
     global CURRENT_LINE, BY_LINE_MODE, program
     # HIGHLIGHT CURRENT LINE AND REMOVE HIGHLIGHT FROM ALL OTHER
-    editor.editor.tag_add("current_line", str(CURRENT_LINE), str(CURRENT_LINE + 0.71))
+    editor.editor.tag_add("current_line", str(CURRENT_LINE), str(CURRENT_LINE + EDITOR_WIDTH/100))
     editor.editor.tag_config("current_line", background="black", foreground="white")
     editor.editor.tag_remove("current_line", "1.0", str(CURRENT_LINE))
-    editor.editor.tag_remove("current_line", str(CURRENT_LINE + 0.71), END)
+    editor.editor.tag_remove("current_line", str(CURRENT_LINE + EDITOR_WIDTH/100), END)
     # PROCESS LINE
     CURRENT_LINE += 1.0
     line = program.readline()
@@ -393,4 +397,5 @@ if __name__ == "__main__":
     memory.print_output("MEMORY_DUMP:")
     # GŁÓWNA PĘTLA PROGRAMU
     dump_all()
+    print(int_to_u2(10))
     root.mainloop()
