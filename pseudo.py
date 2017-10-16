@@ -109,7 +109,7 @@ def interpret(line):
             elif order == "DS": # ALOKACJA PAMIĘCI BEZ WARTOSCI
                 store_label(label)
                 for _ in range(count): MEMORY.append(None)
-    elif match('^(L[AR]?|ST)\s+[0-9]+,\s+.+', line): # OPERACJE ŁADOWANIA Z I DO PAMIĘCI
+    elif match('^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', line): # OPERACJE ŁADOWANIA Z I DO PAMIĘCI
         line = sub('[,\n]','', line).split()
         order = line[0]
         target = line[1]
@@ -118,7 +118,7 @@ def interpret(line):
         elif order == 'LA': REGISTER[int(target)] = source * WORD_LENGTH + MEMORY_START # ADRES OD POCZĄTKU W SŁOWACH
         elif order == 'LR': REGISTER[int(target)] = REGISTER[int(line[2])]
         elif order == 'ST': MEMORY[source] = REGISTER[int(target)]
-    elif match('^[ASMDC]R?\s+[0-9]+,\s+.+', line): # OPERACJE ARYTMETYCZNE I PORÓWNANIA
+    elif match('^[ASMDC]R?\s+[0-9]+\s*,\s*.+', line): # OPERACJE ARYTMETYCZNE I PORÓWNANIA
         line = sub('[,\n]','', line).split()
         order = line[0]
         target = line[1]
@@ -175,10 +175,10 @@ def dump_all():
 # TRANSLATE DECIMAL TO TWO'S COMPLEMENT BINARY
 def int_to_u2(integer):
     if integer == None: return ""
-    binary = bin(integer % (1<<32)).split('b')[1]
+    binary = bin(integer % (1<< (WORD_LENGTH * 8))).split('b')[1]
     if integer >= 0:
         for i in range(8*WORD_LENGTH - len(binary)): binary= '0' + binary
-    return binary      
+    return binary
 # EDITOR TEXTBOX CLASS (ALSO, MENU)
 class Editor():
     def __init__(self, root):
@@ -191,10 +191,6 @@ class Editor():
         self.yscrollbar = Scrollbar(frame, orient="vertical")
         self.xscrollbar = Scrollbar(frame, orient="horizontal")
         self.editor = Text(frame, yscrollcommand=self.yscrollbar.set, xscrollcommand=self.xscrollbar.set, bg="white", cursor="xterm")
-        self.xscrollbar.pack(side="top", fill="x")
-        self.xscrollbar.config(command=self.editor.xview)
-        self.yscrollbar.pack(side="right", fill="y")
-        self.yscrollbar.config(command=self.editor.yview)
         self.editor.pack(side="top", fill="y", expand=1)
         self.editor.config(wrap = "none",
                undo = True,
@@ -312,8 +308,9 @@ class Output():
     def __init__(self, root, side, height = 20):
         self.root = root
         self.yscroll = Scrollbar(self.root, orient="vertical")
-        self.field = Text(self.root, height = height, width = 60, yscrollcommand=self.yscroll.set, cursor="arrow")
-        self.field.config(state = "disabled")
+        self.xscroll = Scrollbar(self.root, orient="horizontal")
+        self.field = Text(self.root, height = height, width = 60, yscrollcommand=self.yscroll.set, xscrollcommand=self.xscroll.set, cursor="arrow")
+        self.field.config(state = "disabled", wrap="none")
         self.field.pack(side=side, fill="x", expand=1)
     def print_output(self, text):
         self.field.config(state = "normal")
@@ -400,7 +397,7 @@ if __name__ == "__main__":
     editor = Editor(root)
     editor.main()
     registers = Output(root, "top")
-    memory = Output(root, "bottom", 10)
+    memory = Output(root, "bottom", 20)
     # MAIN PROGRAM LOOP
     dump_all()
     root.mainloop()
