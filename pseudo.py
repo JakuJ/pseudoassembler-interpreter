@@ -110,7 +110,7 @@ def interpret(line):
                 store_label(label)
                 for _ in range(count): MEMORY.append(None)
     elif match('^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', line): # OPERACJE ŁADOWANIA Z I DO PAMIĘCI
-        line = sub('[,\n]','', line).split()
+        line = sub(',', ' ', sub('\n','', line)).split()
         order = line[0]
         target = line[1]
         source = get_short_adress(line[2])
@@ -119,7 +119,7 @@ def interpret(line):
         elif order == 'LR': REGISTER[int(target)] = REGISTER[int(line[2])]
         elif order == 'ST': MEMORY[source] = REGISTER[int(target)]
     elif match('^[ASMDC]R?\s+[0-9]+\s*,\s*.+', line): # OPERACJE ARYTMETYCZNE I PORÓWNANIA
-        line = sub('[,\n]','', line).split()
+        line = sub(',', ' ', sub('\n','', line)).split()
         order = line[0]
         target = line[1]
         source = line[2]
@@ -383,7 +383,7 @@ def next_line(event=None):
 if __name__ == "__main__":
     # INITIALIZE WINDOW
     global root
-    root = Tk("IDE Window")
+    root = Tk()
     # BUTTONS
     buttons = Frame(root)
     run_button = Button(buttons, text ="RUN CODE", command = run_code)
