@@ -10,7 +10,7 @@ WORD_LENGTH = 4
 ORDERS = ['^J[PNZ]?\s+.+', '^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', '^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', '^[ASMDC]R?\s+[0-9]+\s*,\s*.+']
 # COMPUTER STATE CONTAINERS
 LABELS = dict()
-REGISTER = [None] * 14 + [MEMORY_START,0]
+REGISTER = [None] * 14 + [MEMORY_START, 2000]
 MEMORY = []
 MEMORY_LABELS = dict()
 STATE = 0b00
@@ -72,6 +72,8 @@ def get_label(input_adress):
 # INTERPRET A LINE OF CODE
 def interpret(line):
     global STATE, REGISTER, MEMORY, LABELS, ORDERS, CURRENT_LINE
+    # PUSTE LINIJKI
+    if match("^\s*$", line): return
     # IGNORUJ ETYKIETY
     has_label = True
     line = line.lstrip().rstrip() # OBETNIJ Z BIAŁYCH ZNAKÓW
@@ -333,7 +335,6 @@ def run_code(event=None):
         line = sub('\#.+', '', line)
         if match('^\s*$', line): continue
         if match('^\s*KONIEC\s*$', line): break
-        print(line)
         interpret(line)
     dump_all()
     program.close()
