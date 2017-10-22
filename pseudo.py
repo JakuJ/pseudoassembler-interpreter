@@ -5,12 +5,13 @@ from tkinter import Tk, Text, Scrollbar, Menu, messagebox, filedialog, BooleanVa
 import os, subprocess, json, string
 # MEMORY START ADRESS AND WORD LENGTH IN BYTES
 MEMORY_START = 1000
+PROGRAM_START = 2000
 WORD_LENGTH = 4
 # ORDER RECOGNITION REGULAR EXPRESSIONS
 ORDERS = ['^J[PNZ]?\s+.+', '^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', '^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', '^[ASMDC]R?\s+[0-9]+\s*,\s*.+']
 # COMPUTER STATE CONTAINERS
 LABELS = dict()
-REGISTER = [None] * 14 + [MEMORY_START, 2000]
+REGISTER = [None] * 14 + [MEMORY_START, PROGRAM_START]
 MEMORY = []
 MEMORY_LABELS = dict()
 STATE = 0b00
@@ -22,7 +23,7 @@ EDITOR_WIDTH = 51
 def reset_state():
     global REGISTER, MEMORY, STATE, MEMORY_LABELS, LABELS
     LABELS = dict()
-    REGISTER = [None] * 14 + [MEMORY_START,0]
+    REGISTER = [None] * 14 + [MEMORY_START, PROGRAM_START]
     MEMORY = []
     MEMORY_LABELS = dict()
     STATE = 0b00
