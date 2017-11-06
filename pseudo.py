@@ -56,7 +56,7 @@ def set_state(target):
 def get_short_adress(label):
     if match('^[A-Z_]+$', label): return (MEMORY_LABELS[label] - MEMORY_START) // WORD_LENGTH # ETYKIETA
     elif match('^[0-9]+$', label): return (int(label) - MEMORY_START) // WORD_LENGTH # ADRES
-    elif match('^[0-9]+\([0-9]+\)$', label): # REJESTR ADRESOWY
+    elif match('^\-?[0-9]+\([0-9]+\)$', label): # REJESTR ADRESOWY
         label = sub('\)', '', label).split('(')
         delta = int(label[0])
         register = int(label[1])
