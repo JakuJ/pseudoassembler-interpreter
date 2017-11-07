@@ -100,13 +100,13 @@ def interpret(line):
                 store_label(label)
                 MEMORY.append(None)
         elif match('^[A-Z_]+\s+D[CS]\s+[0-9]+\*INTEGER', line): #  TABLICE ZMIENNYCH
-            line = sub('[\(\)\n]','', line).split()
-            line[2] = line[2].split('*')
+            line = sub('[\)\n]','', sub('\s*\(', '', line)).split()
+            line[2] = line[2].split('*INTEGER')
             label = line[0]
             order = line[1]
             count = int(line[2][0])
             if order == "DC": # WARTOSCI OKRESLONE
-                number = int(line[3])
+                number = int(line[2][1])
                 store_label(label)
                 for _ in range(count): MEMORY.append(number)
             elif order == "DS": # ALOKACJA PAMIĘCI BEZ WARTOSCI
