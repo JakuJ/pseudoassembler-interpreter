@@ -161,6 +161,8 @@ def interpret(line):
             if STATE == 0b00:
                 program.seek(LABELS[label][0])
                 CURRENT_LINE = LABELS[label][1]
+    else: #COULDN'T MATCH ANYTHING
+        raise SyntaxError
 # PRINT ALL INFORMATION TO THE OUTPUT TEXT FIELDS             
 def dump_all():
     # DRUKOWANIE WARTOSCI SŁOWA STANU PROGRAMU ORAZ ZAWARTOSCI REJESTRÓW
@@ -320,15 +322,28 @@ class Output():
         self.field.delete("1.0", END)
         self.field.insert("1.0", text)
         self.field.config(state = "disabled")
+# HALT EXECUTION IF ERROR DETECTED
+def call_error():
+    global STATE, CURRENT_LINE, EDITOR_WIDTH, editor
+    dump_all()
+    STATE = 0b11 # SET STATE TO ERROR CODE
+    # HIGHLIGHT THE WRONG LINE IN RED
+    CURRENT_LINE -= 1
+    editor.editor.tag_add("error_line", str(CURRENT_LINE), str(CURRENT_LINE + EDITOR_WIDTH/100))
+    editor.editor.tag_config("error_line", background="red", foreground="white")
+    editor.editor.tag_remove("error_line", "1.0", str(CURRENT_LINE))
+    editor.editor.tag_remove("error_line", str(CURRENT_LINE + EDITOR_WIDTH/100), END)
 # RUN ALL OF THE CODE AT ONCE
 def run_code(event=None):
-    global program
+    global STATE, CURRENT_LINE, program
     editor.save_if_modified()
     program = open(editor.file_path, mode='r')
     reset_state()
+    editor.editor.tag_remove("error_line", "1.0", END) # CLEAR ERROR HIGHLIGHT
     preprocess_labels()
     # WYZEROWANIE POZYCJI WSKAŹNIKA STRUMIENIA
     program.seek(0)
+    CURRENT_LINE = 1.0
     # GŁÓWNA PĘTLA
     while True:
         line = program.readline()
@@ -336,7 +351,13 @@ def run_code(event=None):
         line = sub('\#.+', '', line)
         if match('^\s*$', line): continue
         if match('^\s*KONIEC\s*$', line): break
-        interpret(line)
+        try: 
+            CURRENT_LINE += 1
+            interpret(line)
+        except:
+            call_error()
+            program.close()
+            return
     dump_all()
     program.close()
 # TOGGLE <RUN_BY_LINE> MODE
@@ -344,6 +365,7 @@ def run_by_line(event=None):
     global BY_LINE_MODE, CURRENT_LINE, program
     if not BY_LINE_MODE:
         BY_LINE_MODE = True
+        editor.editor.tag_remove("error_line", "1.0", END) # CLEAR ERROR HIGHLIGHT
         run_by_line_button.config(text="EXIT BY LINE MODE")
         next_line_button.config(state="normal")
         run_button.config(state="disabled")
@@ -362,11 +384,10 @@ def run_by_line(event=None):
         next_line_button.config(state="disabled")
         run_button.config(state="normal")
         reset_state()
-        # CLEAR HIGHLIGHTING
-        editor.editor.tag_remove("current_line", "1.0", END)
+        editor.editor.tag_remove("current_line", "1.0", END) # CLEAR NORMAL HIGHLIGHTING
 # PROCESS NEXT LINE IN <RUN_BY_LINE> MODE
 def next_line(event=None):
-    global CURRENT_LINE, BY_LINE_MODE, program
+    global CURRENT_LINE, BY_LINE_MODE, STATE, program
     # HIGHLIGHT CURRENT LINE AND REMOVE HIGHLIGHT FROM ALL OTHER
     editor.editor.tag_add("current_line", str(CURRENT_LINE), str(CURRENT_LINE + EDITOR_WIDTH/100))
     editor.editor.tag_config("current_line", background="black", foreground="white")
@@ -379,7 +400,11 @@ def next_line(event=None):
     if match('^\s*KONIEC\s*$', line):
         run_by_line()
         return
-    interpret(line)
+    try: interpret(line)
+    except:
+        call_error()
+        run_by_line()
+        return
     dump_all()
 # MAIN PROGRAM FUNCTION
 if __name__ == "__main__":
