@@ -30,7 +30,7 @@ def reset_state():
     STATE = 0b00
 # GET ALL JUMP LABELS FROM THE CODE
 def preprocess_labels():
-    # PREPROCESSING ETYKIET SKOKU
+    # PREPROCESS JUMP LABELS
     global ORDERS, LABELS, CURRENT_LINE
     CURRENT_LINE = 0.0
     while True:
@@ -53,11 +53,11 @@ def set_state(target):
     elif REGISTER[int(target)] > 0: STATE = 0b01
     elif REGISTER[int(target)] < 0: STATE = 0b10
     else: STATE = 0b11
-# TRANSFORM FULL MEMORY CELL ADRESS INTO PYTHON LIST ONE
+# TRANSFORM FULL MEMORY CELL ADRESS INTO A PYTHON LIST ONE
 def get_short_adress(label):
-    if match('^[A-Z_]+$', label): return (MEMORY_LABELS[label] - MEMORY_START) // WORD_LENGTH # ETYKIETA
-    elif match('^[0-9]+$', label): return (int(label) - MEMORY_START) // WORD_LENGTH # ADRES
-    elif match('^\-?[0-9]+\([0-9]+\)$', label): # REJESTR ADRESOWY
+    if match('^[A-Z_]+$', label): return (MEMORY_LABELS[label] - MEMORY_START) // WORD_LENGTH # LABEL
+    elif match('^[0-9]+$', label): return (int(label) - MEMORY_START) // WORD_LENGTH # ADRESS
+    elif match('^\-?[0-9]+\([0-9]+\)$', label): # ADRESS REGISTER
         label = sub('\)', '', label).split('(')
         delta = int(label[0])
         register = int(label[1])
@@ -74,11 +74,11 @@ def get_label(input_adress):
 # INTERPRET A LINE OF CODE
 def interpret(line):
     global STATE, REGISTER, MEMORY, LABELS, ORDERS, CURRENT_LINE
-    # PUSTE LINIJKI
+    # EMPTY LINES
     if match("^\s*$", line): return
-    # IGNORUJ ETYKIETY
+    # IGNORE LABELS
     has_label = True
-    line = line.lstrip().rstrip() # OBETNIJ Z BIAŁYCH ZNAKÓW
+    line = line.lstrip().rstrip() # STRIP WHITESPACE
     for regex in ORDERS:
         if match(regex, line): 
             has_label = False
@@ -87,9 +87,11 @@ def interpret(line):
         line = line.split()
         line.pop(0)
         line = ' '.join(line).lstrip()
-    # WŁASCIWE INSTRUKCJE
-    if match('^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', line): # DYREKTYWY DEKLARACJI ZMIENNYCH
-        if match('^[A-Z_]+\s+D[CS]\s+INTEGER', line): # POJEDYŃCZE ZMIENNE
+    # LABEL ONLY LINES
+    if line == '': return
+    # ACTUAL INSTRUCTIONS' PROCESSING
+    if match('^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', line): # VARIABLE DECLARATION DIRECTIVES
+        if match('^[A-Z_]+\s+D[CS]\s+INTEGER', line): # SINGULAR VARIABLES
             line = sub('[\(\)\n]',' ', line).split()
             label = line[0]
             order = line[1]   
@@ -100,34 +102,34 @@ def interpret(line):
             elif order == "DS":
                 store_label(label)
                 MEMORY.append(None)
-        elif match('^[A-Z_]+\s+D[CS]\s+[0-9]+\*INTEGER', line): #  TABLICE ZMIENNYCH
+        elif match('^[A-Z_]+\s+D[CS]\s+[0-9]+\*INTEGER', line): #  ARRAYS
             line = sub('[\)\n]','', sub('\s*\(', '', line)).split()
             line[2] = line[2].split('*INTEGER')
             label = line[0]
             order = line[1]
             count = int(line[2][0])
-            if order == "DC": # WARTOSCI OKRESLONE
+            if order == "DC": # DEFINED VALUES
                 number = int(line[2][1])
                 store_label(label)
                 for _ in range(count): MEMORY.append(number)
-            elif order == "DS": # ALOKACJA PAMIĘCI BEZ WARTOSCI
+            elif order == "DS": # NO VALUE MEMORY ALLOCATION
                 store_label(label)
                 for _ in range(count): MEMORY.append(None)
-    elif match('^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', line): # OPERACJE ŁADOWANIA Z I DO PAMIĘCI
+    elif match('^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', line): # MEMORY LOADING AND STORAGE 
         line = sub(',', ' ', sub('\n','', line)).split()
         order = line[0]
         target = line[1]
         source = get_short_adress(line[2])
-        if order == 'L': REGISTER[int(target)] = MEMORY[source]
-        elif order == 'LA': REGISTER[int(target)] = source * WORD_LENGTH + MEMORY_START # ADRES OD POCZĄTKU W SŁOWACH
-        elif order == 'LR': REGISTER[int(target)] = REGISTER[int(line[2])]
-        elif order == 'ST': MEMORY[source] = REGISTER[int(target)]
-    elif match('^[ASMDC]R?\s+[0-9]+\s*,\s*.+', line): # OPERACJE ARYTMETYCZNE I PORÓWNANIA
+        if order == 'L': REGISTER[int(target)] = MEMORY[source] # LOAD CELL VALUE
+        elif order == 'LA': REGISTER[int(target)] = source * WORD_LENGTH + MEMORY_START # LOAD CELL ADRESS
+        elif order == 'LR': REGISTER[int(target)] = REGISTER[int(line[2])] # COPY FROM REGISTER TO REGISTER
+        elif order == 'ST': MEMORY[source] = REGISTER[int(target)] # STORE IN MEMORY
+    elif match('^[ASMDC]R?\s+[0-9]+\s*,\s*.+', line): # ARITHMETIC AND COMPARISON OPERATORS
         line = sub(',', ' ', sub('\n','', line)).split()
         order = line[0]
         target = line[1]
         source = line[2]
-        # SPRAWDZANIE CZY OPERACJA TYPU REJESTR - REJESTR
+        # CHECK IF REGISTER-REGISTER TYPE OPERATION
         if match('.R', order): source = REGISTER[int(source)]
         else: source = MEMORY[get_short_adress(line[2])]
         # ADD, SUBTRACT, MULTIPLY, DIVIDE
@@ -143,7 +145,7 @@ def interpret(line):
             elif target > source: STATE = 0b01
             elif target < source: STATE = 0b10
             else: STATE = 0b11
-    elif match('^J[PNZ]?\s+[A-Z_]+', line): # OPERACJE SKOKU
+    elif match('^J[PNZ]?\s+[A-Z_]+', line): # JUMP ORDERS
         line = line.split()
         order = line[0]
         label = sub('\n','',line[1])
@@ -162,18 +164,18 @@ def interpret(line):
             if STATE == 0b00:
                 program.seek(LABELS[label][0])
                 CURRENT_LINE = LABELS[label][1]
-    else: #COULDN'T MATCH ANYTHING
+    else: # RAISE ERROR IF COULDN'T MATCH ANYTHING
         raise SyntaxError
 # PRINT ALL INFORMATION TO THE OUTPUT TEXT FIELDS             
 def dump_all():
-    # DRUKOWANIE WARTOSCI SŁOWA STANU PROGRAMU ORAZ ZAWARTOSCI REJESTRÓW
+    # DUMPING REGISTERS AND PROGRAM STATE
     formated_state = bin(STATE).split('b')[1]
     if STATE <2: formated_state = '0' + formated_state
     registers_text = "STATE:\t" + formated_state +  "\nREGISTERS:\nINDEX\tVALUE\tTWO'S COMPLEMENT\n"
     for x in range(len(REGISTER)):
         registers_text = registers_text + str(x) + "\t" + str(REGISTER[x]) + "\t" + int_to_u2(REGISTER[x]) + "\n"
     registers.print_output(registers_text)
-    # DRUKOWANIE ZAWARTOSCI PAMIĘCI
+    # DUMPING MEMORY
     memory_text = "MEMORY:\nADRESS\tVALUE:\tLABEL:\tTWO'S COMPLEMENT:\n"
     for x in range(len(MEMORY)):
         memory_text = memory_text + str(x * WORD_LENGTH + MEMORY_START) + "\t" + str(MEMORY[x]) + "\t" + get_label(x * WORD_LENGTH + MEMORY_START) + "\t" + int_to_u2(MEMORY[x]) +"\n"
@@ -210,7 +212,7 @@ class Editor():
         # TOP LEVEL MENU
         self.menubar = Menu(root)
         # MENU ITEM FILE
-        filemenu = Menu(self.menubar, tearoff=0) # teardown = 0 -> can't be separated from window
+        filemenu = Menu(self.menubar, tearoff=0) # tearoff = 0 -> can't be separated from window
         filemenu.add_command(label="New", underline=1, command=self.file_new, accelerator="Ctrl+N")
         filemenu.add_command(label="Open...", underline=1, command=self.file_open, accelerator="Ctrl+O")
         filemenu.add_command(label="Save", underline=1, command=self.file_save, accelerator="Ctrl+S")
@@ -297,7 +299,16 @@ class Editor():
         self.editor.edit_undo()
         
     def redo(self, event=None):
-        self.editor.edit_redo()   
+        self.editor.edit_redo()  
+
+    def highlight(self, background, foreground, tag, event=None):
+        global CURRENT_LINE, EDITOR_WIDTH
+        # HIGHLIGHT THE CURRENT LINE
+        self.editor.tag_add(tag, str(CURRENT_LINE), str(CURRENT_LINE + EDITOR_WIDTH/100))
+        self.editor.tag_config(tag, background=background, foreground=foreground)
+        # REMOVE HIGHLIGHT FROM ALL OTHER LINES
+        self.editor.tag_remove(tag, "1.0", str(CURRENT_LINE))
+        self.editor.tag_remove(tag, str(CURRENT_LINE + EDITOR_WIDTH/100), END)
             
     def main(self, event=None):          
         self.editor.bind("<Command-o>", self.file_open)
@@ -329,11 +340,7 @@ def call_error():
     dump_all()
     STATE = 0b11 # SET STATE TO ERROR CODE
     # HIGHLIGHT THE WRONG LINE IN RED
-    CURRENT_LINE -= 1
-    editor.editor.tag_add("error_line", str(CURRENT_LINE), str(CURRENT_LINE + EDITOR_WIDTH/100))
-    editor.editor.tag_config("error_line", background="red", foreground="white")
-    editor.editor.tag_remove("error_line", "1.0", str(CURRENT_LINE))
-    editor.editor.tag_remove("error_line", str(CURRENT_LINE + EDITOR_WIDTH/100), END)
+    editor.highlight(background="red", foreground="white", tag="error_line")
 # RUN ALL OF THE CODE AT ONCE
 def run_code(event=None):
     global STATE, CURRENT_LINE, program
@@ -342,18 +349,18 @@ def run_code(event=None):
     reset_state()
     editor.editor.tag_remove("error_line", "1.0", END) # CLEAR ERROR HIGHLIGHT
     preprocess_labels()
-    # WYZEROWANIE POZYCJI WSKAŹNIKA STRUMIENIA
+    # SET STREAM POINTER POSITION TO ZERO
     program.seek(0)
     CURRENT_LINE = 1.0
-    # GŁÓWNA PĘTLA
+    # MAIN LOOP
     while True:
         line = program.readline()
-        # USUWANIE KOMENTARZY
+        # IGNORE COMMENTS
         line = sub('\#.+', '', line)
         if match('^\s*$', line): continue
         if match('^\s*KONIEC\s*$', line): break
         try: 
-            CURRENT_LINE += 1
+            CURRENT_LINE += 1.0
             interpret(line)
         except:
             call_error()
@@ -390,11 +397,8 @@ def run_by_line(event=None):
 def next_line(event=None):
     global CURRENT_LINE, BY_LINE_MODE, STATE, program
     # HIGHLIGHT CURRENT LINE AND REMOVE HIGHLIGHT FROM ALL OTHER
-    editor.editor.tag_add("current_line", str(CURRENT_LINE), str(CURRENT_LINE + EDITOR_WIDTH/100))
-    editor.editor.tag_config("current_line", background="black", foreground="white")
-    editor.editor.tag_remove("current_line", "1.0", str(CURRENT_LINE))
-    editor.editor.tag_remove("current_line", str(CURRENT_LINE + EDITOR_WIDTH/100), END)
-    # PROCESS LINE
+    editor.highlight(background="black", foreground="white", tag="current_line")
+    # PROCESS LINES
     CURRENT_LINE += 1.0
     line = program.readline()
     line = sub('\#.+', '', line)
@@ -403,13 +407,14 @@ def next_line(event=None):
         return
     try: interpret(line)
     except:
+        CURRENT_LINE -= 1
         call_error()
         run_by_line()
         return
     dump_all()
 # MAIN PROGRAM FUNCTION
 if __name__ == "__main__":
-    # INITIALIZE WINDOW
+    # INITIALIZE THE WINDOW
     global root
     root = Tk()
     # BUTTONS
