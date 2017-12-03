@@ -33,4 +33,3 @@ START   A 6, JEDEN
         C 6, DLUGOSC
         JP KONIEC
 	J START
-KONIEC
