@@ -218,11 +218,15 @@ class Editor():
         filemenu.add_command(label="Save", underline=1, command=self.file_save, accelerator="Ctrl+S")
         filemenu.add_command(label="Save As...", underline=5, command=self.file_save_as, accelerator="Ctrl+Alt+S")
         filemenu.add_separator()
+        filemenu.add_command(label="About", underline=1, command=self.about)
         filemenu.add_command(label="Exit", underline=2, command=self.file_quit, accelerator="Alt+F4")
         self.menubar.add_cascade(label="File", underline=0, menu=filemenu)        
         # DISPLAY THE MENU
         root.config(menu=self.menubar)
     
+    def about(self, event=None):
+        messagebox.showinfo("About", "Copyright (c) Jakub Janaszkiewicz 2017")
+
     def save_if_modified(self, event=None):
         if self.editor.edit_modified(): # modified
             response = messagebox.askyesnocancel("Save?", "This document has been modified. Do you want to save changes?") # yes = True, no = False, cancel = None

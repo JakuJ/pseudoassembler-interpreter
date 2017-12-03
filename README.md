@@ -6,7 +6,10 @@ What's working:
 * MacOS, Windows and Linux support
 * Syntax error detection and highlighting
 * Keyboard shortcuts for file manipulation
-* Interpreting Pseudoassembler
 
 To do:
 * Real number registers
+* Spread awareness about registers being "very fast memory"
+
+Known bugs:
+* Shortcuts may not work on Windows machines
