@@ -37,6 +37,7 @@ def preprocess_labels():
         CURRENT_LINE += 1.0
         location = program.tell()
         line = program.readline().lstrip()
+        if program.tell() == location: break # CLEVER CHECKING FOR EOF
         line = sub('\#.*', '', line)
         if match('^\s*$', line): continue
         is_label = True
@@ -45,7 +46,6 @@ def preprocess_labels():
                 is_label = False
                 break
         if is_label: LABELS[line.split()[0]] = (location, CURRENT_LINE)
-        if match('^\s*KONIEC\s*$', line): break
 # SET PROGRAM STATE BITS (0b00 etc.)
 def set_state(target):
     global STATE
@@ -354,11 +354,12 @@ def run_code(event=None):
     CURRENT_LINE = 1.0
     # MAIN LOOP
     while True:
+        location = program.tell()
         line = program.readline()
+        if program.tell() == location: break
         # IGNORE COMMENTS
         line = sub('\#.+', '', line)
         if match('^\s*$', line): continue
-        if match('^\s*KONIEC\s*$', line): break
         try: 
             CURRENT_LINE += 1.0
             interpret(line)
@@ -400,11 +401,12 @@ def next_line(event=None):
     editor.highlight(background="black", foreground="white", tag="current_line")
     # PROCESS LINES
     CURRENT_LINE += 1.0
+    location = program.tell()
     line = program.readline()
-    line = sub('\#.+', '', line)
-    if match('^\s*KONIEC\s*$', line):
+    if program.tell() == location:
         run_by_line()
         return
+    line = sub('\#.+', '', line)
     try: interpret(line)
     except:
         CURRENT_LINE -= 1
