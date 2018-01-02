@@ -8,7 +8,7 @@ What's working:
 * Keyboard shortcuts for file manipulation
 
 To do:
-* Real number registers
+* Real number registers (not really)
 * Spread awareness about registers being "very fast memory"
 
 Known bugs:

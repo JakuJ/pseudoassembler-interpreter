@@ -9,7 +9,7 @@ MEMORY_START = 1000
 PROGRAM_START = 2000
 WORD_LENGTH = 4
 # ORDER RECOGNITION REGULAR EXPRESSIONS
-ORDERS = ['^J[PNZ]?\s+.+', '^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', '^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', '^[ASMDC]R?\s+[0-9]+\s*,\s*.+']
+ORDERS = ['^J[PNZ]?\s+[A-Z_]+\s*$', '^[A-Z]+\s+D(C\s+(\d+\*)?INTEGER(\s*\(\s*\-?\s*\d+\s*\)\s*)?|S\s+(\d+\*)?INTEGER\s*)$', '^(L[AR]?|ST)\s+\d+\s*,\s*([A-Z]+|\d+(\s*\(\s*\d+\s*\))?)\s*$', '^[ASMDC]R?\s+\d+\s*,\s*([A-Z]+|\d+(\s*\(\s*\d+\s*\))?)\s*$']
 # COMPUTER STATE CONTAINERS
 LABELS = dict()
 REGISTER = [None] * 14 + [MEMORY_START, PROGRAM_START]
@@ -90,11 +90,11 @@ def interpret(line):
     # LABEL ONLY LINES
     if line == '': return
     # ACTUAL INSTRUCTIONS' PROCESSING
-    if match('^[A-Z_]+\s+D[CS]\s+([0-9]+\*)?INTEGER', line): # VARIABLE DECLARATION DIRECTIVES
+    if match(ORDERS[1], line): # VARIABLE DECLARATION DIRECTIVES
         if match('^[A-Z_]+\s+D[CS]\s+INTEGER', line): # SINGULAR VARIABLES
             line = sub('[\(\)\n]',' ', line).split()
             label = line[0]
-            order = line[1]   
+            order = line[1]
             if order == "DC":
                 value = int(line[3])
                 store_label(label)
@@ -115,16 +115,16 @@ def interpret(line):
             elif order == "DS": # NO VALUE MEMORY ALLOCATION
                 store_label(label)
                 for _ in range(count): MEMORY.append(None)
-    elif match('^(L[AR]?|ST)\s+[0-9]+\s*,\s*.+', line): # MEMORY LOADING AND STORAGE 
+    elif match(ORDERS[2], line): # MEMORY LOADING AND STORAGE
         line = sub(',', ' ', sub('\n','', line)).split()
         order = line[0]
         target = line[1]
-        source = get_short_adress(line[2])
+        source = get_short_adress(''.join(line[2:]))
         if order == 'L': REGISTER[int(target)] = MEMORY[source] # LOAD CELL VALUE
         elif order == 'LA': REGISTER[int(target)] = source * WORD_LENGTH + MEMORY_START # LOAD CELL ADRESS
         elif order == 'LR': REGISTER[int(target)] = REGISTER[int(line[2])] # COPY FROM REGISTER TO REGISTER
         elif order == 'ST': MEMORY[source] = REGISTER[int(target)] # STORE IN MEMORY
-    elif match('^[ASMDC]R?\s+[0-9]+\s*,\s*.+', line): # ARITHMETIC AND COMPARISON OPERATORS
+    elif match(ORDERS[3], line): # ARITHMETIC AND COMPARISON OPERATORS
         line = sub(',', ' ', sub('\n','', line)).split()
         order = line[0]
         target = line[1]
@@ -145,7 +145,7 @@ def interpret(line):
             elif target > source: STATE = 0b01
             elif target < source: STATE = 0b10
             else: STATE = 0b11
-    elif match('^J[PNZ]?\s+[A-Z_]+', line): # JUMP ORDERS
+    elif match(ORDERS[0], line): # JUMP ORDERS
         line = line.split()
         order = line[0]
         label = sub('\n','',line[1])
@@ -358,19 +358,17 @@ def run_code(event=None):
     CURRENT_LINE = 1.0
     # MAIN LOOP
     while True:
+        CURRENT_LINE += 1.0
         location = program.tell()
         line = program.readline()
-        if program.tell() == location: break
-        # IGNORE COMMENTS
-        line = sub('\#.+', '', line)
+        if program.tell() == location: break # EOF CHECKING
+        line = sub('\#.+', '', line) # IGNORE COMMENTS
         if match('^\s*$', line): continue
-        try: 
-            CURRENT_LINE += 1.0
-            interpret(line)
+        try: interpret(line)
         except:
+            CURRENT_LINE -= 1
             call_error()
-            program.close()
-            return
+            break
     dump_all()
     program.close()
 # TOGGLE <RUN_BY_LINE> MODE
@@ -410,7 +408,7 @@ def next_line(event=None):
     if program.tell() == location:
         run_by_line()
         return
-    line = sub('\#.+', '', line)
+    line = sub('\#.+', '', line) # IGNORE COMMENTS
     try: interpret(line)
     except:
         CURRENT_LINE -= 1
