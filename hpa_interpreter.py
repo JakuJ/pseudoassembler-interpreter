@@ -9,17 +9,21 @@ MEMORY_START = 1000
 PROGRAM_START = 2000
 WORD_LENGTH = 4
 # ORDER RECOGNITION REGULAR EXPRESSIONS
-ORDERS = ['^J[PNZ]?\s+[A-Z_]+\s*$', '^[A-Z]+\s+D(C\s+(\d+\*)?INTEGER(\s*\(\s*\-?\s*\d+\s*\)\s*)?|S\s+(\d+\*)?INTEGER\s*)$', '^(L[AR]?|ST)\s+\d+\s*,\s*([A-Z]+|\d+(\s*\(\s*\d+\s*\))?)\s*$', '^[ASMDC]R?\s+\d+\s*,\s*([A-Z]+|\d+(\s*\(\s*\d+\s*\))?)\s*$']
+ORDERS = ['^J[PNZ]?\s+[A-Z_]+\s*$',
+          '^[A-Z]+\s+D(C\s+(\d+\*)?INTEGER(\s*\(\s*\-?\s*\d+\s*\)\s*)?|S\s+(\d+\*)?INTEGER\s*)$',
+          '^(L[AR]?|ST)\s+\d+\s*,\s*([A-Z]+|\d+(\s*\(\s*\d+\s*\))?)\s*$',
+          '^[ASMDC]R?\s+\d+\s*,\s*([A-Z]+|\d+(\s*\(\s*\d+\s*\))?)\s*$']
 # COMPUTER STATE CONTAINERS
 LABELS = dict()
 REGISTER = [None] * 14 + [MEMORY_START, PROGRAM_START]
 MEMORY = []
 MEMORY_LABELS = dict()
 STATE = 0b00
-# <BY_LINE_MODE> VARIABLES
+# INTERPRETER MODE VARIABLES
 BY_LINE_MODE = False
 CURRENT_LINE = 1.0
 EDITOR_WIDTH = 51
+U2_VISIBLE = False
 # RESET COMPUTER STATE
 def reset_state():
     global REGISTER, MEMORY, STATE, MEMORY_LABELS, LABELS
@@ -168,17 +172,26 @@ def interpret(line):
         raise SyntaxError
 # PRINT ALL INFORMATION TO THE OUTPUT TEXT FIELDS             
 def dump_all():
+    global STATE, REGISTER, WORD_LENGTH, MEMORY, MEMORY_START, U2_VISIBLE
     # DUMPING REGISTERS AND PROGRAM STATE
     formated_state = bin(STATE).split('b')[1]
-    if STATE <2: formated_state = '0' + formated_state
-    registers_text = "STATE:\t" + formated_state +  "\nREGISTERS:\nINDEX\tVALUE\tTWO'S COMPLEMENT\n"
+    if STATE < 2: formated_state = '0' + formated_state
+    registers_text = "STATE:\t" + formated_state +  "\nREGISTERS:\nINDEX\tVALUE"
+    if U2_VISIBLE: registers_text += "\t\tTWO'S COMPLEMENT:"
+    registers_text += "\n"
     for x in range(len(REGISTER)):
-        registers_text = registers_text + str(x) + "\t" + str(REGISTER[x]) + "\t" + int_to_u2(REGISTER[x]) + "\n"
+        registers_text += str(x) + "\t" + str(REGISTER[x])
+        if U2_VISIBLE: registers_text += "\t\t" + int_to_u2(REGISTER[x])
+        registers_text += "\n"
     registers.print_output(registers_text)
     # DUMPING MEMORY
-    memory_text = "MEMORY:\nADRESS\tVALUE:\tLABEL:\tTWO'S COMPLEMENT:\n"
+    memory_text = "MEMORY:\nADRESS\tVALUE:\tLABEL:"
+    if U2_VISIBLE: memory_text += "\tTWO'S COMPLEMENT:"
+    memory_text += "\n"
     for x in range(len(MEMORY)):
-        memory_text = memory_text + str(x * WORD_LENGTH + MEMORY_START) + "\t" + str(MEMORY[x]) + "\t" + get_label(x * WORD_LENGTH + MEMORY_START) + "\t" + int_to_u2(MEMORY[x]) +"\n"
+        memory_text += str(x * WORD_LENGTH + MEMORY_START) + "\t" + str(MEMORY[x]) + "\t" + get_label(x * WORD_LENGTH + MEMORY_START)
+        if U2_VISIBLE: memory_text += "\t" + int_to_u2(MEMORY[x])
+        memory_text += "\n"
     memory.print_output(memory_text)
 # TRANSLATE DECIMAL TO TWO'S COMPLEMENT BINARY
 def int_to_u2(integer):
@@ -187,6 +200,11 @@ def int_to_u2(integer):
     if integer >= 0:
         for i in range(8*WORD_LENGTH - len(binary)): binary= '0' + binary
     return binary
+# TOGGLE TWO'S COMPLEMENT INTEGER REPRESENTATION IN OUTPUT BOXES
+def toggle_u2():
+    global U2_VISIBLE
+    U2_VISIBLE = not U2_VISIBLE
+    dump_all()
 # EDITOR TEXTBOX CLASS (ALSO, MENU)
 class Editor():
     def __init__(self, root):
@@ -298,10 +316,10 @@ class Editor():
         else:
             title = "Untitled"
         self.root.title(title + " - " + self.TITLE)
-        
+
     def undo(self, event=None):
         self.editor.edit_undo()
-        
+
     def redo(self, event=None):
         self.editor.edit_redo()  
 
@@ -330,14 +348,14 @@ class Output():
         self.root = root
         self.yscroll = Scrollbar(self.root, orient="vertical")
         self.xscroll = Scrollbar(self.root, orient="horizontal")
-        self.field = Text(self.root, height = height, width = 60, yscrollcommand=self.yscroll.set, xscrollcommand=self.xscroll.set, cursor="arrow")
-        self.field.config(state = "disabled", wrap="none")
+        self.field = Text(self.root, height=height, width=60, yscrollcommand=self.yscroll.set, xscrollcommand=self.xscroll.set, cursor="arrow")
+        self.field.config(state="disabled", wrap="none")
         self.field.pack(side=side, fill="x", expand=1)
     def print_output(self, text):
-        self.field.config(state = "normal")
+        self.field.config(state="normal")
         self.field.delete("1.0", END)
         self.field.insert("1.0", text)
-        self.field.config(state = "disabled")
+        self.field.config(state="disabled")
 # HALT EXECUTION IF ERROR DETECTED
 def call_error():
     global STATE, CURRENT_LINE, EDITOR_WIDTH, editor
@@ -423,12 +441,14 @@ if __name__ == "__main__":
     root = Tk()
     # BUTTONS
     buttons = Frame(root)
-    run_button = Button(buttons, text ="RUN CODE", command = run_code)
-    run_by_line_button = Button(buttons, text="RUN BY LINE", command = run_by_line)
-    next_line_button = Button(buttons, text ="NEXT LINE", command = next_line, state="disabled")
+    run_button = Button(buttons, text="RUN CODE", command=run_code)
+    run_by_line_button = Button(buttons, text="RUN BY LINE", command=run_by_line)
+    next_line_button = Button(buttons, text="NEXT LINE", command=next_line, state="disabled")
+    toggle_u2_button = Button(buttons, text="TOGGLE U2", command=toggle_u2)
     run_button.pack(side="left")
     run_by_line_button.pack(side="left")
     next_line_button.pack(side="left")
+    toggle_u2_button.pack(side="left")
     buttons.pack(side="top", fill="x")
     # TEXT FIELDS
     editor = Editor(root)
