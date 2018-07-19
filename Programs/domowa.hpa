@@ -11,9 +11,7 @@ M 10, CZTERY
 L 6, ZERO
 PETLA	A 6, JEDEN
 	ST 6, 0(7)
-	S 6, JEDEN
 	A 7, CZTERY
-	A 6, JEDEN
 	C 6, DLUGOSC
 	JN PETLA
 
@@ -31,6 +29,6 @@ START   A 6, JEDEN
         A 8, CZTERY
         S 7, CZTERY
         C 6, DLUGOSC
-        JP KONIEC
+        JZ KONIEC
 	J START
 KONIEC

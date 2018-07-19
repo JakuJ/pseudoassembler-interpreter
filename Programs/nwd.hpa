@@ -1,9 +1,9 @@
-A	DC INTEGER (165)
-B       DC INTEGER (1200)
+_A	DC INTEGER (165)
+_B       DC INTEGER (1200)
 WYNIK   DS INTEGER
 
-L   0, A
-L   1, B
+L   0, _A
+L   1, _B
 PETLA   CR 0, 1
         JZ WYPISZ
         JN PRAWA
