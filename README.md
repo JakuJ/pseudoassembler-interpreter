@@ -1,5 +1,4 @@
-# pseudoassembler-interpreter
-An interpreter for prof. Homenda's Pseudoassembler
+# An interpreter for prof. Homenda's Pseudoassembler
 
 ---
 What's working:
@@ -8,8 +7,8 @@ What's working:
 * Keyboard shortcuts for file manipulation
 
 To do:
-* Real number registers (not really)
-* Spread awareness about registers being "very fast memory"
+* ~~Real number registers~~ (you will never use it)
+* Spread awareness about registers being **very fast memory**
 
 Known bugs:
-* Shortcuts may not work on Windows machines
+* Keyboard shortcuts may not work on Windows machines
